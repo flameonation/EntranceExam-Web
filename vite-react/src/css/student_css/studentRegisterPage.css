@@ -1,0 +1,486 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html {
+    font-size: 14px;
+}
+
+.srp-page {
+    min-height: 100vh;
+    background-image: url('../assets/images/bg.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 24px 16px;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.srp-card {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
+    width: 100%;
+    max-width: min(860px, 92vw);
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    margin-bottom: 24px;
+    position: relative;
+}
+
+.srp-header {
+    background: linear-gradient(135deg, #0a5e20 0%, #16a34a 50%, #22c55e 100%);
+    padding: clamp(16px, 2.5vh, 28px) clamp(20px, 3vw, 36px);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    color: #ffffff;
+    position: relative;
+    overflow: hidden;
+}
+
+.srp-header::after {
+    content: "";
+    position: absolute;
+    right: -30px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 200px;
+    height: 200px;
+    background-image: var(--watermark);
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    opacity: 0.1;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.srp-logo-wrap {
+    position: relative;
+    z-index: 1;
+    flex-shrink: 0;
+    width: clamp(48px, 6vw, 64px);
+    height: clamp(48px, 6vw, 64px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.srp-logo {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+}
+
+.srp-titles {
+    position: relative;
+    z-index: 1;
+    flex: 1;
+}
+
+.srp-school-name {
+    font-size: clamp(16px, 2.2vw, 22px);
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    margin-bottom: 2px;
+    text-transform: uppercase;
+    line-height: 1.2;
+}
+
+.srp-form-label {
+    font-size: clamp(9px, 1vw, 11px);
+    font-weight: 500;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    opacity: 0.85;
+}
+
+.srp-room-label {
+    font-size: clamp(9px, 1vw, 11px);
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    opacity: 0.9;
+    margin-top: 2px;
+}
+
+.srp-form {
+    padding: clamp(16px, 2.5vh, 28px) clamp(20px, 3vw, 36px);
+}
+
+.srp-section {
+    margin-bottom: clamp(16px, 2vh, 24px);
+}
+
+.srp-section-title {
+    font-size: clamp(10px, 1.1vw, 13px);
+    font-weight: 700;
+    color: #0e7f2c;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    margin-bottom: clamp(10px, 1.5vh, 16px);
+    padding-bottom: 8px;
+    border-bottom: 1.5px solid #dcfce7;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.srp-section-title::before {
+    content: "";
+    width: 3px;
+    height: 14px;
+    background: linear-gradient(180deg, #0e7f2c, #22c55e);
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+
+.srp-grid {
+    display: grid;
+    gap: clamp(10px, 1.5vw, 16px);
+    margin-bottom: clamp(10px, 1.5vh, 16px);
+}
+
+.srp-grid-1 {
+    grid-template-columns: 1fr;
+}
+
+.srp-grid-2 {
+    grid-template-columns: 1fr 1fr;
+}
+
+.srp-grid-3 {
+    grid-template-columns: 1fr 1fr 1fr;
+}
+
+.srp-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.srp-label {
+    font-size: clamp(9px, 0.9vw, 11px);
+    font-weight: 600;
+    color: #4b5563;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+.srp-input {
+    padding: clamp(8px, 1vh, 11px) clamp(10px, 1.2vw, 14px);
+    border: 1.5px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: clamp(12px, 1.1vw, 13px);
+    font-family: inherit;
+    color: #111827;
+    background-color: #ffffff;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    outline: none;
+    width: 100%;
+}
+
+.srp-input:hover {
+    border-color: #d1fae5;
+}
+
+.srp-input:focus {
+    border-color: #0e7f2c;
+    background: #ffffff;
+    box-shadow: 0 0 0 3px rgba(14, 127, 44, 0.1), 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.srp-select {
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='%230e7f2c' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 36px;
+}
+
+.srp-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, #e5e7eb, transparent);
+    margin: clamp(12px, 1.8vh, 20px) 0;
+}
+
+.srp-check-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 8px 0 12px 0;
+    padding: clamp(8px, 1.2vh, 12px) 14px;
+    background: #f0fdf4;
+    border-radius: 8px;
+    border: 1.5px solid #d1fae5;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.srp-check-wrap:hover {
+    background: #dcfce7;
+    border-color: #86efac;
+}
+
+.srp-checkbox {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    accent-color: #0e7f2c;
+    flex-shrink: 0;
+}
+
+.srp-check-label {
+    font-size: clamp(12px, 1.1vw, 13px);
+    font-weight: 500;
+    color: #1f2937;
+    cursor: pointer;
+    user-select: none;
+}
+
+.srp-submit-btn {
+    width: 100%;
+    padding: clamp(10px, 1.5vh, 14px);
+    margin-top: 8px;
+    background: linear-gradient(135deg, #0e7f2c 0%, #16a34a 50%, #22c55e 100%);
+    color: #ffffff;
+    border: none;
+    border-radius: 10px;
+    font-size: clamp(13px, 1.2vw, 15px);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(14, 127, 44, 0.3), 0 1px 3px rgba(0,0,0,0.1);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    font-family: inherit;
+}
+
+.srp-submit-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(14, 127, 44, 0.4);
+}
+
+.srp-fade-in {
+    animation: srpFadeIn 0.25s ease forwards;
+}
+
+@keyframes srpFadeIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.srp-twitter-footer {
+    width: 100%;
+    max-width: min(860px, 92vw);
+    padding: 14px 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    margin-top: auto;
+}
+
+.srp-footer-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 3px;
+}
+
+.srp-footer-org {
+    color: #000000;
+    font-weight: 700;
+    font-size: clamp(12px, 1.1vw, 14px);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+
+.srp-footer-credit {
+    color: rgba(0, 0, 0, 0.8);
+    font-size: clamp(10px, 0.9vw, 12px);
+    font-weight: 400;
+}
+
+.srp-eye-wrap {
+    position: fixed;
+    right: clamp(12px, 2vw, 30px);
+    bottom: clamp(12px, 2vh, 30px);
+    width: clamp(120px, 14vw, 200px);
+    height: clamp(120px, 14vw, 200px);
+    z-index: 999;
+    pointer-events: none;
+}
+
+.srp-eye-img {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    top: 0;
+    left: 0;
+    transition: opacity 0.3s ease;
+}
+
+.srp-eye-img.close {
+    opacity: 0;
+}
+
+.srp-eye-wrap:hover .srp-eye-img.close {
+    opacity: 1;
+}
+
+.srp-eye-wrap:hover .srp-eye-img.open {
+    opacity: 0;
+}
+
+.srp-eye-img.open {
+    animation: eyeOpen 10s infinite;
+}
+
+.srp-eye-img.close {
+    animation: eyeClose 10s infinite;
+}
+
+@keyframes eyeOpen {
+    0% { opacity: 1; }
+    94% { opacity: 1; }
+    95% { opacity: 0; }
+    97% { opacity: 0; }
+    100% { opacity: 1; }
+}
+
+@keyframes eyeClose {
+    0% { opacity: 0; }
+    94% { opacity: 0; }
+    95% { opacity: 1; }
+    97% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+.srp-eye-click-layer {
+    position: fixed;
+    right: clamp(12px, 2vw, 30px);
+    bottom: clamp(12px, 2vh, 30px);
+    width: clamp(120px, 14vw, 200px);
+    height: clamp(120px, 14vw, 200px);
+    z-index: 998;
+    cursor: pointer;
+}
+
+.srp-eye-msg {
+    position: fixed;
+    right: calc(clamp(12px, 2vw, 30px) + clamp(120px, 14vw, 200px) - 100px);
+    bottom: calc(clamp(12px, 2vh, 30px) + clamp(120px, 14vw, 200px) - 50px);
+    width: clamp(100px, 11vw, 120px);
+    height: auto;
+    z-index: 1000;
+    animation: srpFadeIn 0.2s ease;
+}
+
+.srp-blocked {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    width: 100vw;
+    background-color: #ffffff;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    text-align: center;
+    padding: 20px;
+}
+
+.srp-blocked-content {
+    max-width: 500px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+}
+
+.srp-blocked-img {
+    width: 200px;
+    height: auto;
+    object-fit: contain;
+}
+
+.srp-blocked-title {
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #0e7f2c;
+}
+
+.srp-blocked-text {
+    font-size: 1rem;
+    color: #6b7280;
+    line-height: 1.5;
+}
+
+.srp-blocked-security {
+    margin-top: -20px;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 2px;
+    color: #ff3b3b;
+    text-transform: uppercase;
+    opacity: 0.85;
+}
+
+@media (max-height: 768px) {
+    .srp-page {
+        padding: 16px;
+    }
+    .srp-section {
+        margin-bottom: 12px;
+    }
+    .srp-divider {
+        margin: 10px 0;
+    }
+    .srp-grid {
+        margin-bottom: 10px;
+    }
+}
+
+@media (max-height: 680px) {
+    .srp-page {
+        padding: 10px 16px;
+    }
+    .srp-section {
+        margin-bottom: 8px;
+    }
+    .srp-divider {
+        margin: 8px 0;
+    }
+}
+
+@media (min-width: 1024px) and (max-width: 1280px) {
+    .srp-card {
+        max-width: min(800px, 88vw);
+    }
+}
+
+@media (min-width: 1280px) and (max-width: 1440px) {
+    .srp-card {
+        max-width: min(840px, 82vw);
+    }
+}
+
+@media (min-width: 1440px) {
+    .srp-card {
+        max-width: 880px;
+    }
+}

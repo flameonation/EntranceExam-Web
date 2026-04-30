@@ -1,0 +1,306 @@
+.kns-admin-layout {
+    display: flex;
+    min-height: 100vh;
+    background-color: #f8fafb;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+.kns-sidebar {
+    width: 260px;
+    background-color: #062b14;
+    color: white;
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    height: 100vh;
+    padding: 24px 0;
+    z-index: 100;
+}
+
+.kns-logo-section {
+    display: flex;
+    align-items: center;
+    padding: 0 24px 40px;
+    gap: 12px;
+}
+
+.kns-logo-circle {
+    width: 38px;
+    height: 38px;
+    background-color: #0c4222;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 18px;
+    color: #062b14;
+}
+
+.kns-brand-name {
+    display: block;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: -0.3px;
+    white-space: nowrap;
+}
+
+.kns-dept-name {
+    display: block;
+    font-size: 10px;
+    opacity: 0.6;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.kns-side-nav {
+    flex-grow: 1;
+    padding: 0 12px;
+}
+
+.kns-nav-link {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    background: transparent;
+    border: none;
+    color: #a3b1a8;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.kns-nav-icon-wrapper {
+    margin-right: 12px;
+    display: flex;
+    align-items: center;
+    opacity: 0.7;
+}
+
+.kns-nav-link:hover, .kns-nav-link.active {
+    background-color: rgba(255, 255, 255, 0.08);
+    color: white;
+}
+
+.kns-nav-link.active {
+    background-color: #154d19;
+    color: #ffffff;
+}
+
+.kns-nav-link.active .kns-nav-icon-wrapper {
+    opacity: 1;
+}
+
+.kns-logout-trigger {
+    margin: 0 12px 24px;
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    color: white;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+/* MAIN VIEWPORT */
+.kns-main-viewport {
+    flex-grow: 1;
+    margin-left: 260px;
+}
+
+.kns-topbar {
+    height: 70px;
+    background: white;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 40px;
+    border-bottom: 1px solid #edf2f7;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.kns-search-wrapper {
+    background: #ffffff;
+    padding: 10px 16px;
+    border-radius: 10px;
+    width: 320px;
+    display: flex;
+    align-items: center;
+    color: #94a3b8;
+}
+
+.kns-search-wrapper input {
+    background: transparent;
+    border: none;
+    margin-left: 10px;
+    outline: none;
+    width: 100%;
+    font-size: 14px;
+}
+
+.kns-admin-profile {
+    display: flex;
+    align-items: center;
+    gap: 32px;
+}
+
+.kns-notif-bell {
+    position: relative;
+    cursor: pointer;
+    color: #64748b;
+}
+
+.kns-notif-count {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    background: #ef4444;
+    color: white;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 4px;
+    border-radius: 6px;
+    border: 2px solid white;
+}
+
+.kns-profile-data {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.kns-avatar {
+    width: 38px;
+    height: 38px;
+    background: #062b14;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.kns-user-name {
+    font-size: 13px;
+    font-weight: 700;
+    margin: 0;
+    color: #1e293b;
+}
+
+.kns-user-role {
+    font-size: 11px;
+    color: #64748b;
+    margin: 0;
+}
+
+/* CONTENT AREA */
+.kns-content-inner {
+    padding: 32px 40px;
+}
+
+.kns-welcome-banner {
+    background: white;
+    border-left: 6px solid #0c4222;
+    padding: 28px 32px;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 32px;
+    position: relative;
+}
+
+.kns-welcome-banner h1 {
+    font-size: 24px;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0 0 8px;
+}
+
+.kns-welcome-banner p {
+    color: #64748b;
+    margin: 0;
+    font-size: 14px;
+}
+
+.kns-dashboard-grid {
+    display: grid;
+    grid-template-columns: 1.8fr 1.2fr;
+    gap: 32px;
+}
+
+.kns-activity-panel, .kns-actions-panel {
+    background: white;
+    border-radius: 16px;
+    padding: 32px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.02);
+}
+
+.kns-panel-header h3 {
+    font-size: 18px;
+    font-weight: 700;
+    margin: 0 0 24px;
+    color: #0f172a;
+}
+
+.kns-placeholder-box {
+    border: 2px dashed #e2e8f0;
+    padding: 60px;
+    border-radius: 12px;
+    text-align: center;
+    color: #94a3b8;
+}
+
+.kns-actions-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+}
+
+.kns-action-btn {
+    background: white;
+    border: 1px solid #f1f5f9;
+    padding: 16px;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: left;
+}
+
+.kns-action-btn:hover {
+    background: #f0fdf4;
+    border-color: #0c4222;
+    color: #062b14;
+    transform: translateX(4px);
+}
+
+.kns-main-logo {
+    width: 42px;
+    height: 42px;
+    object-fit: contain;
+    filter: drop-shadow(0 0 8px rgba(46, 204, 113, 0.2));
+}
+
+.kns-logo-section {
+    display: flex;
+    align-items: center;
+    padding: 0 20px 40px;
+    gap: 14px;
+}

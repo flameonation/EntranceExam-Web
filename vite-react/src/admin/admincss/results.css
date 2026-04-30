@@ -1,0 +1,89 @@
+#print-area {
+    display: none;
+}
+
+.kns-info-row {
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+.kns-info-label {
+    font-family: Arial, Helvetica, sans-serif;
+    color: #000;
+}
+
+@media print {
+    html, body {
+        height: 0 !important;
+        overflow: hidden !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    body * {
+        visibility: hidden;
+    }
+
+    #print-area,
+    #print-area * {
+        visibility: visible;
+    }
+
+    #print-area {
+        display: block !important;
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: auto !important;
+        overflow: visible !important;
+        margin: 0;
+        padding: 0;
+        background: white;
+    }
+
+    .kns-print-container {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+        margin-top: 0;
+    }
+
+    hr {
+        border: none;
+        border-top: 1px solid #000 !important;
+        margin: 6px 0;
+    }
+
+    @page {
+        margin: 0.3in 0.4in;
+        size: legal portrait;
+    }
+
+    .kns-info-row {
+        display: flex !important;
+        flex-direction: row !important;
+    }
+
+    div[style*="grid-template-columns"] {
+        display: grid !important;
+        border-color: black !important;
+    }
+
+    div[style*="border"] {
+        border-color: black !important;
+    }
+
+    span, div, h3, strong {
+        color: black !important;
+    }
+}
+
+.kns-print-container {
+    line-height: 1.4;
+}
+
+.kns-exam-grant {
+    line-height: 1.6;
+    font-size: 13px;
+}
