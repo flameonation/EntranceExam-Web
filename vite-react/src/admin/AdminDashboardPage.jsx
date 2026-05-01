@@ -5,8 +5,11 @@ import jpcsLogo from '../assets/images/JPCS.jpg';
 import QuestionsPage from './QuestionsPage';
 import ResultsPage from './ResultPage';
 import StudentListPage from './StudentListPage';
+import BoardPasserPage from './BoardPasserPage';
+import SettingsPage from './SettingsPage';
 import Swal from 'sweetalert2';
 import './admincss/RoomsData.css';
+
 
 const ROOMS = [
     { id: 'avr', label: 'AVR', color: '#16a34a', glow: 'rgba(22,163,74,0.18)' },
@@ -600,6 +603,7 @@ const Icon = ({ name }) => {
         questions: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22h.01" /><path d="M7 18v-3a5 5 0 1 1 10 0v1a2 2 0 0 0 2 2h1" /><path d="M21 15V9a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h7" /></svg>,
         examSettings: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2" /><line x1="16" x2="16" y1="2" y2="6" /><line x1="8" x2="8" y1="2" y2="6" /><line x1="3" x2="21" y1="10" y2="10" /><path d="m9 16 2 2 4-4" /></svg>,
         results: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><path d="M12 11h.01" /><path d="M12 16h.01" /></svg>,
+        boardPasser: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="6" /><path d="M8 14v7l4-2 4 2v-7" /><path d="m9 11 2 2 4-4" /></svg>,
         settings: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1-2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1Z" /></svg>,
         logout: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" x2="9" y1="12" y2="12" /></svg>,
         search: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>,
@@ -608,6 +612,7 @@ const Icon = ({ name }) => {
     };
     return icons[name] || null;
 };
+
 
 const availableCourses = [
     "Bachelor of Science in Computer Science",
@@ -1124,6 +1129,7 @@ export default function AdminDashboardPage() {
         { name: 'ROOMS DATA', id: 'examSettings' },
         { name: 'STUDENT LIST', id: 'students' },
         { name: 'QUESTION BANK', id: 'questions' },
+        { name: 'BOARD PASSER', id: 'boardPasser' },
         { name: 'RESULTS', id: 'results' },
         { name: 'SETTINGS', id: 'settings' },
     ];
@@ -1132,6 +1138,7 @@ export default function AdminDashboardPage() {
         { name: 'DASHBOARD', id: 'dashboard' },
         { name: 'STUDENT LIST', id: 'students' },
         { name: 'QUESTION BANK', id: 'questions' },
+        { name: 'BOARD PASSER', id: 'boardPasser' },
         { name: 'RESULTS', id: 'results' },
     ];
 
@@ -1160,10 +1167,12 @@ export default function AdminDashboardPage() {
 
     const renderMainContent = () => {
         switch (activeTab) {
+            case 'BOARD PASSER': return <BoardPasserPage />;
             case 'QUESTION BANK': return <QuestionsPage />;
             case 'RESULTS': return <ResultsPage />;
             case 'STUDENT LIST': return <StudentListPage />;
             case 'ROOMS DATA': return <RoomsData />;
+            case 'SETTINGS': return <SettingsPage />;
             case 'DASHBOARD':
                 return (
                     <div className="kns-content-inner">

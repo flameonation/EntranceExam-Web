@@ -84,7 +84,7 @@ export default function StudentPrint({ student, result, onReady }) {
             <img
                 src={logo}
                 alt="Kolehiyo ng Subic Logo"
-                style={{ width: "80px", height: "auto", position: "absolute", marginLeft: "210px", }}
+                style={{ width: "80px", height: "auto", position: "absolute", marginLeft: "200px", }}
             />
 
             <div style={{ textAlign: "center", fontWeight: "bold", fontSize: "20px" }}>
@@ -95,7 +95,7 @@ export default function StudentPrint({ student, result, onReady }) {
                 Subic, Zambales
             </div>
 
-            <h3 style={{ textAlign: "center", marginTop: "10px" }}>
+            <h3 style={{ textAlign: "center", marginTop: "10px" , marginBottom: "20px" }}>
                 REGISTRATION FORM
             </h3>
 

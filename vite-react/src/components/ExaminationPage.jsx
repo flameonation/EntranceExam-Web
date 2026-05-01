@@ -1,19 +1,30 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Swal from "sweetalert2";
 import '../css/student_css/examinationPage.css';
 import knsLogo from '../assets/images/knslogo.png';
 
+const EXAM_DURATION_SECONDS = 60 * 60;
+
 export default function Examination() {
     const API_URL = import.meta.env.VITE_API_URL;
     const [questions, setQuestions] = useState([]);
-    const [answers, setAnswers] = useState({});
+    const [answers, setAnswers] = useState(() => {
+        try {
+            const saved = localStorage.getItem("saved_answers");
+            return saved ? JSON.parse(saved) : {};
+        } catch {
+            return {};
+        }
+    });
     const [isExamFinished, setIsExamFinished] = useState(false);
     const [showModal, setShowModal] = useState(false);
     const [subjectOrder, setSubjectOrder] = useState([]);
+    const [timeLeft, setTimeLeft] = useState(null);
+    const timerRef = useRef(null);
+    const hasAutoSubmitted = useRef(false);
 
     const user = JSON.parse(localStorage.getItem("exam_user"));
     const room = localStorage.getItem("exam_room");
-
     const roomPath = room === "avr" ? "/register-avr" : "/register-comlab";
 
     useEffect(() => {
@@ -21,13 +32,44 @@ export default function Examination() {
     }, []);
 
     useEffect(() => {
-        const saved = localStorage.getItem("saved_answers");
-        if (saved) setAnswers(JSON.parse(saved));
-    }, []);
-
-    useEffect(() => {
         localStorage.setItem("saved_answers", JSON.stringify(answers));
     }, [answers]);
+
+    useEffect(() => {
+        const storedStart = localStorage.getItem("exam_start_time");
+        let startTime;
+
+        if (storedStart) {
+            startTime = parseInt(storedStart, 10);
+        } else {
+            startTime = Date.now();
+            localStorage.setItem("exam_start_time", startTime.toString());
+        }
+
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const remaining = EXAM_DURATION_SECONDS - elapsed;
+
+        if (remaining <= 0) {
+            handleAutoSubmit();
+            return;
+        }
+
+        setTimeLeft(remaining);
+
+        timerRef.current = setInterval(() => {
+            const newElapsed = Math.floor((Date.now() - startTime) / 1000);
+            const newRemaining = EXAM_DURATION_SECONDS - newElapsed;
+            if (newRemaining <= 0) {
+                clearInterval(timerRef.current);
+                setTimeLeft(0);
+                handleAutoSubmit();
+            } else {
+                setTimeLeft(newRemaining);
+            }
+        }, 1000);
+
+        return () => clearInterval(timerRef.current);
+    }, []);
 
     useEffect(() => {
         fetch(`${API_URL}/api/all-questions`)
@@ -56,13 +98,51 @@ export default function Examination() {
     }, [API_URL]);
 
     function handleAnswerChange(questionId, value) {
-        setAnswers(prev => ({ ...prev, [questionId]: value }));
+        const id = String(questionId);
+        setAnswers(prev => {
+            const updated = { ...prev, [id]: value };
+            localStorage.setItem("saved_answers", JSON.stringify(updated));
+            return updated;
+        });
+    }
+
+    async function handleAutoSubmit() {
+        if (hasAutoSubmitted.current || isExamFinished) return;
+        hasAutoSubmitted.current = true;
+
+        const currentAnswers = JSON.parse(localStorage.getItem("saved_answers") || "{}");
+
+        try {
+            const res = await fetch(`${API_URL}/api/exam/submit`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ userId: user?._id, answers: currentAnswers })
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                localStorage.removeItem("saved_answers");
+                localStorage.removeItem("exam_user");
+                localStorage.removeItem("exam_room");
+                localStorage.removeItem("exam_start_time");
+                setIsExamFinished(true);
+                await Swal.fire({
+                    title: "Time's Up!",
+                    text: "Your answers have been automatically submitted.",
+                    icon: "warning",
+                    timer: 3000,
+                    showConfirmButton: false
+                });
+                window.location.href = roomPath;
+            }
+        } catch (err) {
+            console.error("Auto-submit failed:", err);
+        }
     }
 
     async function finishExam() {
         if (isExamFinished) return;
 
-        const unanswered = questions.filter(q => !answers[q._id]);
+        const unanswered = questions.filter(q => !answers[String(q._id)]);
         if (unanswered.length > 0) {
             const proceed = await Swal.fire({
                 title: "Unanswered Questions",
@@ -93,9 +173,11 @@ export default function Examination() {
             });
             const data = await res.json();
             if (res.ok && data.success) {
+                clearInterval(timerRef.current);
                 localStorage.removeItem("saved_answers");
                 localStorage.removeItem("exam_user");
                 localStorage.removeItem("exam_room");
+                localStorage.removeItem("exam_start_time");
                 setIsExamFinished(true);
                 await Swal.fire({ title: "Exam Completed!", icon: "success", timer: 2000, showConfirmButton: false });
                 window.location.href = roomPath;
@@ -105,6 +187,13 @@ export default function Examination() {
         } catch (err) {
             Swal.fire("Error", "Network error while submitting.", "error");
         }
+    }
+
+    function formatTime(seconds) {
+        if (seconds === null) return "--:--";
+        const m = Math.floor(seconds / 60).toString().padStart(2, "0");
+        const s = (seconds % 60).toString().padStart(2, "0");
+        return `${m}:${s}`;
     }
 
     const questionsBySubject = {};
@@ -149,17 +238,24 @@ export default function Examination() {
             </header>
 
             <div className="exam-only-wrapper">
-                <header className="exam-only-header" style={{ display: 'block', textAlign: 'left' }}>
-                    <h1 className="exam-only-title" style={{ marginBottom: '10px', fontSize: '20px' }}>
-                        {user?.name}
-                    </h1>
-                    <div style={{ fontSize: '13px', fontWeight: '600', lineHeight: '1.6' }}>
-                        <div style={{ color: '#0e7f2c' }}>
-                            <span style={{ color: '#555' }}>1ST CHOICE: </span> {user?.firstCourse}
+                <header className="exam-only-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div style={{ textAlign: 'left' }}>
+                        <h1 className="exam-only-title" style={{ marginBottom: '10px', fontSize: '20px' }}>
+                            {user?.name}
+                        </h1>
+                        <div style={{ fontSize: '13px', fontWeight: '600', lineHeight: '1.6' }}>
+                            <div style={{ color: '#0e7f2c' }}>
+                                <span style={{ color: '#555' }}>1ST CHOICE: </span> {user?.firstCourse}
+                            </div>
+                            <div style={{ color: '#0e7f2c' }}>
+                                <span style={{ color: '#555' }}>2ND CHOICE: </span> {user?.secondCourse}
+                            </div>
                         </div>
-                        <div style={{ color: '#0e7f2c' }}>
-                            <span style={{ color: '#555' }}>2ND CHOICE: </span> {user?.secondCourse}
-                        </div>
+                    </div>
+
+                    <div className={`exam-timer ${timeLeft !== null && timeLeft <= 300 ? 'timer-warning' : ''}`}>
+                        <span className="timer-label">Time Remaining</span>
+                        <span className="timer-display">{formatTime(timeLeft)}</span>
                     </div>
                 </header>
 
@@ -183,7 +279,7 @@ export default function Examination() {
                                                             id={optionId}
                                                             name={`question-${question._id}`}
                                                             value={letter}
-                                                            checked={answers[question._id] === letter}
+                                                            checked={answers[String(question._id)] === letter}
                                                             onChange={() => handleAnswerChange(question._id, letter)}
                                                         />
                                                         <label htmlFor={optionId}>

@@ -244,3 +244,46 @@
         font-size: 32px;
     }
 }
+
+.exam-timer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: #f0fff4;
+    border: 2px solid #0e7f2c;
+    border-radius: 10px;
+    padding: 10px 20px;
+    min-width: 130px;
+}
+
+.timer-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #555;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+}
+
+.timer-display {
+    font-size: 28px;
+    font-weight: 900;
+    color: #0a6a25;
+    font-family: monospace;
+    letter-spacing: 2px;
+}
+
+.timer-warning {
+    border-color: #c0392b;
+    background: #fff5f5;
+}
+
+.timer-warning .timer-display {
+    color: #c0392b;
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}

@@ -26,6 +26,7 @@ export default function StudentRegisterPage({ room }) {
 
     const [showText, setShowText] = useState(true);
     const [isAllowed, setIsAllowed] = useState(true);
+    const [showCourseModal, setShowCourseModal] = useState(false);
 
     useEffect(() => {
         document.title = `Register (${room})`;
@@ -84,6 +85,15 @@ export default function StudentRegisterPage({ room }) {
 
     async function handleSubmit(e) {
         e.preventDefault();
+
+        const hasFirst = form.firstCourse !== "";
+        const hasSecond = form.secondCourse !== "";
+
+        if (!hasFirst || !hasSecond) {
+            setShowCourseModal(true);
+            return;
+        }
+
         try {
             const API_URL = import.meta.env.VITE_API_URL;
             const res = await fetch(`${API_URL}/api/users/register`, {
@@ -128,13 +138,10 @@ export default function StudentRegisterPage({ room }) {
             <div className="srp-blocked">
                 <div className="srp-blocked-content">
                     <img src={huleImg} alt="Blocked" className="srp-blocked-img" />
-
                     <h1 className="srp-blocked-title">THIS PAGE IS NOT AVAILABLE</h1>
-
                     <p className="srp-blocked-text">
                         Nice try. This portal isn't for phones.
                     </p>
-
                     <p className="srp-blocked-security">
                         MONITORED BY JPCS SECURITY SYSTEM
                     </p>
@@ -145,6 +152,49 @@ export default function StudentRegisterPage({ room }) {
 
     return (
         <div className="srp-page">
+            {showCourseModal && (
+                <div className="srp-modal-overlay" onClick={() => setShowCourseModal(false)}>
+                    <div className="srp-modal" onClick={e => e.stopPropagation()}>
+                        <div className="srp-modal-header">
+                            <h2 className="srp-modal-title">Course Selection Required</h2>
+                        </div>
+                        <div className="srp-modal-body">
+                            <p className="srp-modal-text">
+                                You must select <strong>both</strong> a 1st Course Choice and a 2nd Course Choice before proceeding.
+                            </p>
+                            <div className="srp-modal-course-status">
+                                <div className={`srp-modal-course-item ${form.firstCourse ? "srp-modal-course-filled" : "srp-modal-course-empty"}`}>
+                                    <span className="srp-modal-course-indicator">{form.firstCourse ? "✓" : "✗"}</span>
+                                    <div className="srp-modal-course-info">
+                                        <span className="srp-modal-course-label">1st Course Choice</span>
+                                        <span className="srp-modal-course-value">
+                                            {form.firstCourse || "Not yet selected"}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className={`srp-modal-course-item ${form.secondCourse ? "srp-modal-course-filled" : "srp-modal-course-empty"}`}>
+                                    <span className="srp-modal-course-indicator">{form.secondCourse ? "✓" : "✗"}</span>
+                                    <div className="srp-modal-course-info">
+                                        <span className="srp-modal-course-label">2nd Course Choice</span>
+                                        <span className="srp-modal-course-value">
+                                            {form.secondCourse || "Not yet selected"}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="srp-modal-footer">
+                            <button
+                                className="srp-modal-close-btn"
+                                onClick={() => setShowCourseModal(false)}
+                            >
+                                Go Back & Complete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div
                 className="srp-eye-click-layer"
                 onClick={() => setShowText(prev => !prev)}
@@ -208,7 +258,7 @@ export default function StudentRegisterPage({ room }) {
                             <div className="srp-field">
                                 <label className="srp-label">Contact No. *</label>
                                 <input
-                                    type="tel"
+                                    type="number"
                                     name="contact"
                                     className="srp-input"
                                     value={form.contact}
@@ -221,7 +271,7 @@ export default function StudentRegisterPage({ room }) {
                         </div>
                         <div className="srp-grid srp-grid-2">
                             <div className="srp-field">
-                                <label className="srp-label">Place of Birth</label>
+                                <label className="srp-label">Place of Birth *</label>
                                 <input
                                     type="text"
                                     name="pob"
@@ -229,6 +279,7 @@ export default function StudentRegisterPage({ room }) {
                                     value={form.pob}
                                     onChange={handleChange}
                                     placeholder="City, Province"
+                                    required
                                 />
                             </div>
                             <div className="srp-field">
@@ -258,7 +309,6 @@ export default function StudentRegisterPage({ room }) {
                                     className="srp-input srp-select"
                                     value={form.firstCourse}
                                     onChange={handleChange}
-                                    required
                                 >
                                     <option value="" disabled hidden>Select 1st Course</option>
                                     {availableCourses.map(c => (
@@ -269,7 +319,7 @@ export default function StudentRegisterPage({ room }) {
                         </div>
                         <div className="srp-grid srp-grid-1" style={{ marginTop: "12px" }}>
                             <div className="srp-field">
-                                <label className="srp-label">2nd Course Choice</label>
+                                <label className="srp-label">2nd Course Choice *</label>
                                 <select
                                     name="secondCourse"
                                     className="srp-input srp-select"
@@ -305,7 +355,7 @@ export default function StudentRegisterPage({ room }) {
                         </div>
                         <div className="srp-grid srp-grid-1">
                             <div className="srp-field">
-                                <label className="srp-label">Address of Last School</label>
+                                <label className="srp-label">Address of Last School *</label>
                                 <input
                                     type="text"
                                     name="lastSchoolAddress"
@@ -313,6 +363,7 @@ export default function StudentRegisterPage({ room }) {
                                     value={form.lastSchoolAddress}
                                     onChange={handleChange}
                                     placeholder="Street, Barangay, City"
+                                    required
                                 />
                             </div>
                         </div>

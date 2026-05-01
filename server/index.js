@@ -5,6 +5,7 @@ const cors = require("cors");
 const userRoutes = require("./routes/userRoutes");
 const questionRoutes = require("./routes/questionRoutes");
 const resultRoutes = require("./routes/resultRoutes");
+const settingsRouter = require('./routes/settings');
 
 const app = express();
 
@@ -18,6 +19,7 @@ mongoose.connect(process.env.MONGO_URI)
 app.use("/api/users", userRoutes);
 app.use("/api", questionRoutes);
 app.use("/api", resultRoutes);
+app.use('/api/settings', settingsRouter);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Server on ${PORT}`));

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import axios from "axios";
 import Swal from "sweetalert2";
-import { Pencil, Trash2, ArrowUpDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { Pencil, Trash2, ArrowUpDown, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import StudentPrint from "./PrintPage";
 import "./admincss/resultPage.css";
 
@@ -11,6 +11,7 @@ export default function ResultsPage() {
     const [selectedStudent, setSelectedStudent] = useState(null);
     const [selectedResult, setSelectedResult] = useState(null);
     const [filterDate, setFilterDate] = useState("");
+    const [searchQuery, setSearchQuery] = useState("");
     const [editModalOpen, setEditModalOpen] = useState(false);
     const [editingResult, setEditingResult] = useState(null);
     const [subjectScores, setSubjectScores] = useState([]);
@@ -57,6 +58,11 @@ export default function ResultsPage() {
             items = items.filter(r => new Date(r.submittedAt).toISOString().split("T")[0] === filterDate);
         }
 
+        if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase();
+            items = items.filter(r => r.userId?.name?.toLowerCase().includes(q));
+        }
+
         items.sort((a, b) => {
             let valA, valB;
             if (sortConfig.key === 'name') {
@@ -72,7 +78,7 @@ export default function ResultsPage() {
         });
 
         return items;
-    }, [results, filterDate, sortConfig, adminRole, isSuperAdmin]);
+    }, [results, filterDate, searchQuery, sortConfig, adminRole, isSuperAdmin]);
 
     const totalPages = Math.ceil(sortedResults.length / itemsPerPage);
     const paginatedResults = useMemo(() => {
@@ -82,7 +88,7 @@ export default function ResultsPage() {
 
     useEffect(() => {
         setCurrentPage(1);
-    }, [filterDate, sortConfig]);
+    }, [filterDate, searchQuery, sortConfig]);
 
     const handlePrint = (userData, resultData) => {
         setSelectedStudent(null);
@@ -224,6 +230,19 @@ export default function ResultsPage() {
                     </p>
                 </div>
                 <div className="res-filter-bar">
+                    <div className="res-search-wrap">
+                        <Search size={14} className="res-search-icon" />
+                        <input
+                            type="text"
+                            placeholder="Search by name…"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="res-search-input"
+                        />
+                        {searchQuery && (
+                            <button className="res-search-clear" onClick={() => setSearchQuery("")}>✕</button>
+                        )}
+                    </div>
                     <label>Filter by Date:</label>
                     <input
                         type="date"
@@ -232,9 +251,7 @@ export default function ResultsPage() {
                         className="res-date-input"
                     />
                     {filterDate && (
-                        <button className="res-clear-btn" onClick={() => setFilterDate("")}>
-                            Clear
-                        </button>
+                        <button className="res-clear-btn" onClick={() => setFilterDate("")}>Clear</button>
                     )}
                 </div>
             </div>
