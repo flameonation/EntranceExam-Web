@@ -40,71 +40,301 @@ function getHourSlot(dateStr) {
 function formatHourLabel(hour) {
     const ampm = hour >= 12 ? 'PM' : 'AM';
     const h = hour % 12 === 0 ? 12 : hour % 12;
-    return `${h}:00 ${ampm} – ${h === 12 ? 1 : h + 1 > 12 ? h + 1 - 12 : h + 1}:00 ${hour + 1 >= 12 ? 'PM' : 'AM'}`;
+    const nextH = (hour + 1) % 12 === 0 ? 12 : (hour + 1) % 12;
+    const nextAmpm = (hour + 1) >= 12 ? 'PM' : 'AM';
+    return `${h}:00 ${ampm} – ${nextH}:00 ${nextAmpm}`;
 }
 
-function AccordionPrintView({ groups, onClose, dateFilter, timeSlotFilter }) {
+let docxModule = null;
+async function getDocx() {
+    if (docxModule) return docxModule;
+    docxModule = await import('https://cdn.jsdelivr.net/npm/docx@8.5.0/+esm');
+    return docxModule;
+}
+
+async function generateDocx({ groups, dateFilter, timeSlotFilter, viewMode, filtered, bracketFilter, letterFilter, accordionSort, sectionSorts }) {
+    const docx = await getDocx();
+    const {
+        Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
+        AlignmentType, BorderStyle, WidthType, ShadingType, VerticalAlign,
+        PageBreak, TabStopType,
+    } = docx;
+
+    const dateLine = dateFilter
+        ? `Date of Examination: ${formatDatePH(dateFilter + 'T00:00:00')}`
+        : `As of: ${new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })}`;
+    const timePart = timeSlotFilter !== '' ? ` — ${formatHourLabel(Number(timeSlotFilter))}` : '';
+    const fullDateLine = dateLine + timePart;
+    const printedLine = `Printed: ${new Date().toLocaleString('en-PH')}`;
+
+    // Legal size: 8.5" × 14" (1 inch = 1440 twips)
+    const PAGE_WIDTH = 12240;   // 8.5"
+    const PAGE_HEIGHT = 20160;  // 14"
+    const MARGIN = 1080;        // 0.75"
+    const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
+
+    const noBorder = { style: BorderStyle.NONE, size: 0, color: 'auto' };
+    const lightBorder = { style: BorderStyle.SINGLE, size: 4, color: 'E2E8F0' };
+    const darkBorder = { style: BorderStyle.SINGLE, size: 8, color: '062B14' };
+
+    function makeHeader(titleText, titleColor) {
+        const cleanColor = titleColor.replace('#', '');
+        return [
+            new Paragraph({
+                alignment: AlignmentType.CENTER,
+                spacing: { before: 0, after: 40 },
+                children: [new TextRun({ text: 'KOLEHIYO NG SUBIC', bold: true, size: 40, color: '062B14', font: 'Arial' })],
+            }),
+            new Paragraph({
+                alignment: AlignmentType.CENTER,
+                spacing: { before: 0, after: 80 },
+                children: [new TextRun({ text: 'Office of the Registrar — Entrance Examination Results', size: 18, color: '475569', font: 'Arial' })],
+            }),
+            new Paragraph({
+                border: { bottom: { style: BorderStyle.SINGLE, size: 12, color: '16A34A', space: 4 } },
+                spacing: { before: 60, after: 60 },
+                children: [],
+            }),
+            new Paragraph({
+                alignment: AlignmentType.CENTER,
+                spacing: { before: 80, after: 40 },
+                children: [new TextRun({ text: titleText, bold: true, size: 28, color: cleanColor, font: 'Arial' })],
+            }),
+            new Paragraph({
+                alignment: AlignmentType.CENTER,
+                spacing: { before: 0, after: 160 },
+                children: [new TextRun({ text: fullDateLine, size: 18, color: '64748B', font: 'Arial' })],
+            }),
+        ];
+    }
+
+    function makeTable(students, showBracket) {
+        // Legal 8.5" wide with 0.75" margins = 7" content
+        // Columns: #, Name, 1st Course, 2nd Course, Score[, Bracket]
+        const colWidths = showBracket
+            ? [400, 2200, 2500, 2500, 700, 1780]
+            : [400, 2400, 3000, 3000, 780, 500];
+
+        const hdrLabels = showBracket
+            ? ['#', 'Name', '1st Course Choice', '2nd Course Choice', 'Score', 'Bracket']
+            : ['#', 'Name', '1st Course Choice', '2nd Course Choice', 'Score', ''];
+
+        const SCORE_COL = 4;
+
+        const headerRow = new TableRow({
+            tableHeader: true,
+            children: hdrLabels.map((text, i) => new TableCell({
+                width: { size: colWidths[i], type: WidthType.DXA },
+                shading: { fill: '062B14', type: ShadingType.CLEAR },
+                borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
+                margins: { top: 100, bottom: 100, left: 120, right: 120 },
+                verticalAlign: VerticalAlign.CENTER,
+                children: [new Paragraph({
+                    alignment: (i === 0 || i === SCORE_COL) ? AlignmentType.CENTER : AlignmentType.LEFT,
+                    children: [new TextRun({ text, bold: true, size: 16, color: 'FFFFFF', font: 'Arial' })],
+                })],
+            })),
+        });
+
+        const dataRows = students.map((s, idx) => {
+            const b = getBracket(s.score ?? 0);
+            const fill = idx % 2 === 1 ? 'F8FAFB' : 'FFFFFF';
+            const scoreColor = b.color.replace('#', '');
+            const values = showBracket
+                ? [String(idx + 1), s.name || '—', s.firstCourse || '—', s.secondCourse || '—', String(s.score ?? 0), b.label]
+                : [String(idx + 1), s.name || '—', s.firstCourse || '—', s.secondCourse || '—', String(s.score ?? 0), ''];
+
+            return new TableRow({
+                children: values.map((text, i) => new TableCell({
+                    width: { size: colWidths[i], type: WidthType.DXA },
+                    shading: { fill, type: ShadingType.CLEAR },
+                    borders: { top: lightBorder, bottom: lightBorder, left: noBorder, right: noBorder },
+                    margins: { top: 80, bottom: 80, left: 120, right: 120 },
+                    verticalAlign: VerticalAlign.CENTER,
+                    children: [new Paragraph({
+                        alignment: (i === 0 || i === SCORE_COL) ? AlignmentType.CENTER : AlignmentType.LEFT,
+                        children: [new TextRun({
+                            text,
+                            size: i === SCORE_COL ? 22 : 18,
+                            bold: i === SCORE_COL,
+                            color: i === SCORE_COL ? scoreColor : i === 0 ? '94A3B8' : '0F172A',
+                            font: 'Arial',
+                        })],
+                    })],
+                })),
+            });
+        });
+
+        const totalRow = new TableRow({
+            children: [new TableCell({
+                columnSpan: 6,
+                width: { size: CONTENT_WIDTH, type: WidthType.DXA },
+                shading: { fill: 'FFFFFF', type: ShadingType.CLEAR },
+                borders: { top: darkBorder, bottom: noBorder, left: noBorder, right: noBorder },
+                margins: { top: 80, bottom: 80, left: 120, right: 120 },
+                children: [new Paragraph({
+                    alignment: AlignmentType.RIGHT,
+                    children: [new TextRun({
+                        text: `Total: ${students.length} examinee${students.length !== 1 ? 's' : ''}`,
+                        bold: true, size: 18, color: '062B14', font: 'Arial',
+                    })],
+                })],
+            })],
+        });
+
+        return new Table({
+            width: { size: CONTENT_WIDTH, type: WidthType.DXA },
+            columnWidths: colWidths,
+            rows: [headerRow, ...dataRows, totalRow],
+        });
+    }
+
+    function makeFooter() {
+        return new Paragraph({
+            border: { top: { style: BorderStyle.SINGLE, size: 4, color: 'E2E8F0', space: 6 } },
+            spacing: { before: 240, after: 0 },
+            tabStops: [{ type: TabStopType.RIGHT, position: CONTENT_WIDTH }],
+            children: [
+                new TextRun({ text: 'Kolehiyo Ng Subic — Entrance Examination Management System', size: 16, color: '94A3B8', font: 'Arial' }),
+                new TextRun({ text: `\t${printedLine}`, size: 16, color: '94A3B8', font: 'Arial' }),
+            ],
+        });
+    }
+
+    const children = [];
+
+    if (viewMode === 'accordion') {
+        const nonEmpty = groups.filter(g => g.students.length > 0);
+        nonEmpty.forEach((group, gi) => {
+            if (gi > 0) children.push(new Paragraph({ children: [new PageBreak()] }));
+            children.push(...makeHeader(group.label, group.color));
+            const sorted = sortStudents(group.students, sectionSorts[group.label] ?? accordionSort);
+            children.push(makeTable(sorted, false));
+            children.push(makeFooter());
+        });
+        if (nonEmpty.length === 0) {
+            children.push(new Paragraph({ children: [new TextRun({ text: 'No examinees to export.', size: 20, font: 'Arial', color: '94A3B8' })] }));
+        }
+    } else {
+        const titleLabel = bracketFilter === 'all' ? 'All Examinees' : bracketFilter;
+        const letterPart = letterFilter !== 'all' ? ` — ${letterFilter}` : '';
+        children.push(...makeHeader(titleLabel + letterPart, '#0F172A'));
+        children.push(makeTable(filtered, true));
+        children.push(makeFooter());
+    }
+
+    const doc = new Document({
+        sections: [{
+            properties: {
+                page: {
+                    size: { width: PAGE_WIDTH, height: PAGE_HEIGHT },
+                    margin: { top: MARGIN, right: MARGIN, bottom: MARGIN, left: MARGIN },
+                },
+            },
+            children,
+        }],
+    });
+
+    return Packer.toBlob(doc);
+}
+
+function BracketPage({ group, dateFilter, timeSlotFilter, isLast }) {
+    if (group.students.length === 0) return null;
     return (
-        <div className="bp-print-overlay">
-            <div className="bp-print-controls no-print">
-                <button className="bp-print-btn" onClick={() => window.print()}>🖨 Print / Save as PDF</button>
-                <button className="bp-print-close" onClick={onClose}>✕ Close</button>
+        <div className={`bp-print-page${isLast ? '' : ' bp-print-page-break'}`}>
+            <div className="bp-print-header">
+                <h1 className="bp-print-school">KOLEHIYO NG SUBIC</h1>
+                <p className="bp-print-subtitle">Office of the Registrar — Entrance Examination Results</p>
+                <div className="bp-print-divider" />
+                <h2 className="bp-print-title" style={{ color: group.color }}>{group.label}</h2>
+                <p className="bp-print-date">
+                    {dateFilter ? `Date of Examination: ${formatDatePH(dateFilter)}` : `As of: ${new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })}`}
+                    {timeSlotFilter !== '' ? ` — ${formatHourLabel(Number(timeSlotFilter))}` : ''}
+                </p>
             </div>
-            <div className="bp-print-doc">
-                <div className="bp-print-header">
-                    <h1 className="bp-print-school">KOLEHIYO NG SUBIC</h1>
-                    <p className="bp-print-subtitle">Office of the Registrar — Entrance Examination Results</p>
-                    <div className="bp-print-divider" />
-                    <h2 className="bp-print-title">Classified Results by Bracket</h2>
-                    <p className="bp-print-date">
-                        {dateFilter ? `Date of Examination: ${formatDatePH(dateFilter)}` : `As of: ${new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })}`}
-                        {timeSlotFilter !== '' ? ` — ${formatHourLabel(Number(timeSlotFilter))}` : ''}
-                    </p>
-                </div>
-                {groups.map((group, gi) => {
-                    if (group.students.length === 0) return null;
-                    return (
-                        <div key={group.label} style={{ marginTop: gi > 0 ? '24pt' : '0' }}>
-                            <div className="bp-print-section-header" style={{ borderColor: group.color, color: group.color }}>
-                                <span className="bp-print-section-title">{group.label}</span>
-                                <span className="bp-print-section-count">{group.students.length} examinee{group.students.length !== 1 ? 's' : ''}</span>
-                            </div>
-                            <table className="bp-print-table">
-                                <thead>
-                                    <tr>
-                                        <th className="bp-pt-num">#</th>
-                                        <th>Name</th>
-                                        <th>1st Course Choice</th>
-                                        <th>Score</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {group.students.map((s, idx) => (
-                                        <tr key={s._id || idx} className={idx % 2 === 0 ? '' : 'bp-pt-alt'}>
-                                            <td className="bp-pt-num">{idx + 1}</td>
-                                            <td className="bp-pt-name">{s.name}</td>
-                                            <td className="bp-pt-course">{s.firstCourse || '—'}</td>
-                                            <td className="bp-pt-score" style={{ color: group.color }}>{s.score ?? 0}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                                <tfoot>
-                                    <tr><td colSpan={4} className="bp-pt-foot">Subtotal: {group.students.length}</td></tr>
-                                </tfoot>
-                            </table>
-                        </div>
-                    );
-                })}
-                <div className="bp-print-footer">
-                    <p>Kolehiyo Ng Subic — Entrance Examination Management System</p>
-                    <p>Printed: {new Date().toLocaleString('en-PH')}</p>
-                </div>
+            <table className="bp-print-table">
+                <thead>
+                    <tr>
+                        <th className="bp-pt-num">#</th>
+                        <th>Name</th>
+                        <th>1st Course Choice</th>
+                        <th>2nd Course Choice</th>
+                        <th>Score</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {group.students.map((s, idx) => (
+                        <tr key={s._id || idx} className={idx % 2 === 0 ? '' : 'bp-pt-alt'}>
+                            <td className="bp-pt-num">{idx + 1}</td>
+                            <td className="bp-pt-name">{s.name}</td>
+                            <td className="bp-pt-course">{s.firstCourse || '—'}</td>
+                            <td className="bp-pt-course">{s.secondCourse || '—'}</td>
+                            <td className="bp-pt-score" style={{ color: group.color }}>{s.score ?? 0}</td>
+                        </tr>
+                    ))}
+                </tbody>
+                <tfoot>
+                    <tr><td colSpan={5} className="bp-pt-foot">Total: {group.students.length} examinee{group.students.length !== 1 ? 's' : ''}</td></tr>
+                </tfoot>
+            </table>
+            <div className="bp-print-footer">
+                <p>Kolehiyo Ng Subic — Entrance Examination Management System</p>
+                <p>Printed: {new Date().toLocaleString('en-PH')}</p>
             </div>
         </div>
     );
 }
 
-function FlatPrintView({ students, bracketFilter, letterFilter, onClose, dateFilter, timeSlotFilter }) {
+function AccordionPrintView({ groups, onClose, dateFilter, timeSlotFilter, onExportDocx, exporting, exportError }) {
+    const nonEmptyGroups = groups.filter(g => g.students.length > 0);
+    return (
+        <div className="bp-print-overlay">
+            <div className="bp-print-controls no-print">
+                <button className="bp-print-btn" onClick={() => window.print()}>🖨 Print / Save as PDF</button>
+                <button
+                    className="bp-print-btn"
+                    style={{ background: '#1d4ed8' }}
+                    onClick={onExportDocx}
+                    disabled={exporting}
+                >
+                    {exporting ? (
+                        <>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'bp-spin 1s linear infinite' }}><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
+                            Generating…
+                        </>
+                    ) : '📄 Export as Word'}
+                </button>
+                <button className="bp-print-close" onClick={onClose}>✕ Close</button>
+                <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '12px', marginLeft: '8px' }}>
+                    Each bracket prints on its own page(s)
+                </span>
+                {exportError && (
+                    <span style={{ color: '#fca5a5', fontSize: '12px', marginLeft: '8px' }}>
+                        Export failed: {exportError}
+                    </span>
+                )}
+            </div>
+            <div className="bp-print-pages-container">
+                {nonEmptyGroups.map((group, gi) => (
+                    <BracketPage
+                        key={group.label}
+                        group={group}
+                        dateFilter={dateFilter}
+                        timeSlotFilter={timeSlotFilter}
+                        isLast={gi === nonEmptyGroups.length - 1}
+                    />
+                ))}
+                {nonEmptyGroups.length === 0 && (
+                    <div className="bp-print-doc" style={{ textAlign: 'center', padding: '60px', color: '#94a3b8' }}>
+                        No examinees to print.
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+function FlatPrintView({ students, bracketFilter, letterFilter, onClose, dateFilter, timeSlotFilter, onExportDocx, exporting, exportError }) {
     const filtered = students
         .filter(s => {
             const b = getBracket(s.score ?? 0);
@@ -121,7 +351,25 @@ function FlatPrintView({ students, bracketFilter, letterFilter, onClose, dateFil
         <div className="bp-print-overlay">
             <div className="bp-print-controls no-print">
                 <button className="bp-print-btn" onClick={() => window.print()}>🖨 Print / Save as PDF</button>
+                <button
+                    className="bp-print-btn"
+                    style={{ background: '#1d4ed8' }}
+                    onClick={onExportDocx}
+                    disabled={exporting}
+                >
+                    {exporting ? (
+                        <>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'bp-spin 1s linear infinite' }}><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
+                            Generating…
+                        </>
+                    ) : '📄 Export as Word'}
+                </button>
                 <button className="bp-print-close" onClick={onClose}>✕ Close</button>
+                {exportError && (
+                    <span style={{ color: '#fca5a5', fontSize: '12px', marginLeft: '8px' }}>
+                        Export failed: {exportError}
+                    </span>
+                )}
             </div>
             <div className="bp-print-doc">
                 <div className="bp-print-header">
@@ -143,6 +391,7 @@ function FlatPrintView({ students, bracketFilter, letterFilter, onClose, dateFil
                             <th className="bp-pt-num">#</th>
                             <th>Name</th>
                             <th>1st Course Choice</th>
+                            <th>2nd Course Choice</th>
                             <th>Score</th>
                             <th>Bracket</th>
                         </tr>
@@ -155,17 +404,18 @@ function FlatPrintView({ students, bracketFilter, letterFilter, onClose, dateFil
                                     <td className="bp-pt-num">{idx + 1}</td>
                                     <td className="bp-pt-name">{s.name}</td>
                                     <td className="bp-pt-course">{s.firstCourse || '—'}</td>
+                                    <td className="bp-pt-course">{s.secondCourse || '—'}</td>
                                     <td className="bp-pt-score" style={{ color: b.color }}>{s.score ?? 0}</td>
                                     <td><span className={`bp-pt-badge ${b.badgeClass}`}>{b.label}</span></td>
                                 </tr>
                             );
                         })}
                         {filtered.length === 0 && (
-                            <tr><td colSpan={5} className="bp-pt-empty">No records found.</td></tr>
+                            <tr><td colSpan={6} className="bp-pt-empty">No records found.</td></tr>
                         )}
                     </tbody>
                     <tfoot>
-                        <tr><td colSpan={5} className="bp-pt-foot">Total: {filtered.length} examinee{filtered.length !== 1 ? 's' : ''}</td></tr>
+                        <tr><td colSpan={6} className="bp-pt-foot">Total: {filtered.length} examinee{filtered.length !== 1 ? 's' : ''}</td></tr>
                     </tfoot>
                 </table>
                 <div className="bp-print-footer">
@@ -241,7 +491,7 @@ function AccordionSection({ bracket, students, globalSort, onSortChange }) {
                         <table className="bp-table">
                             <thead>
                                 <tr>
-                                    {['#', 'Name', '1st Course Choice', 'Room', 'Score'].map(h => (
+                                    {['#', 'Name', '1st Course Choice', '2nd Course Choice', 'Room', 'Score'].map(h => (
                                         <th key={h} style={{ textAlign: h === '#' || h === 'Score' ? 'center' : 'left' }}>{h}</th>
                                     ))}
                                 </tr>
@@ -255,6 +505,7 @@ function AccordionSection({ bracket, students, globalSort, onSortChange }) {
                                             <div className="bp-name-sub">{r.sex}</div>
                                         </td>
                                         <td className="bp-td-course">{r.firstCourse}</td>
+                                        <td className="bp-td-course">{r.secondCourse || '—'}</td>
                                         <td className="bp-td-room">
                                             <span className={`bp-room-tag ${r.room === 'avr' ? 'bp-room-avr' : 'bp-room-comlab'}`}>
                                                 {r.room === 'avr' ? 'AVR' : r.room === 'comlab-2' ? 'Lab 2' : r.room || '—'}
@@ -297,6 +548,8 @@ export default function BoardPasserPage() {
     const [page, setPage] = useState(1);
     const [accordionSort, setAccordionSort] = useState('score_desc');
     const [sectionSorts, setSectionSorts] = useState({});
+    const [exporting, setExporting] = useState(false);
+    const [exportError, setExportError] = useState('');
     const PER_PAGE = 20;
 
     useEffect(() => {
@@ -327,6 +580,7 @@ export default function BoardPasserPage() {
                     ...r,
                     name: r.userId?.name || '—',
                     firstCourse: r.userId?.firstCourse || '—',
+                    secondCourse: r.userId?.secondCourse || '—',
                     sex: r.userId?.sex || '—',
                     room: r.userId?.room || '—',
                     score: r.score ?? 0,
@@ -385,7 +639,11 @@ export default function BoardPasserPage() {
         if (timeSlotFilter !== '' && getHourSlot(r.submittedAt) !== Number(timeSlotFilter)) return false;
         if (search.trim()) {
             const q = search.toLowerCase();
-            if (!r.name?.toLowerCase().includes(q) && !r.firstCourse?.toLowerCase().includes(q)) return false;
+            if (
+                !r.name?.toLowerCase().includes(q) &&
+                !r.firstCourse?.toLowerCase().includes(q) &&
+                !r.secondCourse?.toLowerCase().includes(q)
+            ) return false;
         }
         return true;
     });
@@ -425,11 +683,65 @@ export default function BoardPasserPage() {
         setPage(1);
     };
 
+    const handleExportDocx = async () => {
+        setExporting(true);
+        setExportError('');
+        try {
+            const blob = await generateDocx({
+                groups: printGroups,
+                dateFilter,
+                timeSlotFilter,
+                viewMode,
+                filtered,
+                bracketFilter,
+                letterFilter,
+                accordionSort,
+                sectionSorts,
+            });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            const datePart = dateFilter ? `_${dateFilter}` : '';
+            a.href = url;
+            a.download = `BoardPassers${datePart}_${new Date().toISOString().slice(0, 10)}.docx`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error('Export error full:', err);
+            setExportError(err?.message || String(err) || 'Unknown export error. Check browser console for details.');
+        } finally {
+            setExporting(false);
+        }
+    };
+
     if (showPrint && viewMode === 'accordion') {
-        return <AccordionPrintView groups={printGroups} onClose={() => setShowPrint(false)} dateFilter={dateFilter} timeSlotFilter={timeSlotFilter} />;
+        return (
+            <AccordionPrintView
+                groups={printGroups}
+                onClose={() => { setShowPrint(false); setExportError(''); }}
+                dateFilter={dateFilter}
+                timeSlotFilter={timeSlotFilter}
+                onExportDocx={handleExportDocx}
+                exporting={exporting}
+                exportError={exportError}
+            />
+        );
     }
     if (showPrint) {
-        return <FlatPrintView students={filtered} bracketFilter={bracketFilter} letterFilter={letterFilter} onClose={() => setShowPrint(false)} dateFilter={dateFilter} timeSlotFilter={timeSlotFilter} />;
+        return (
+            <FlatPrintView
+                students={filtered}
+                bracketFilter={bracketFilter}
+                letterFilter={letterFilter}
+                onClose={() => { setShowPrint(false); setExportError(''); }}
+                dateFilter={dateFilter}
+                timeSlotFilter={timeSlotFilter}
+                onExportDocx={handleExportDocx}
+                exporting={exporting}
+                exportError={exportError}
+            />
+        );
     }
 
     return (
@@ -605,7 +917,7 @@ export default function BoardPasserPage() {
                         <table className="bp-table">
                             <thead>
                                 <tr>
-                                    {['#', 'Name', '1st Course Choice', 'Room', 'Score', 'Bracket'].map(h => (
+                                    {['#', 'Name', '1st Course Choice', '2nd Course Choice', 'Room', 'Score', 'Bracket'].map(h => (
                                         <th key={h} style={{ textAlign: h === '#' || h === 'Score' ? 'center' : 'left' }}>{h}</th>
                                     ))}
                                 </tr>
@@ -613,7 +925,7 @@ export default function BoardPasserPage() {
                             <tbody>
                                 {paginated.length === 0 ? (
                                     <tr>
-                                        <td colSpan={6} className="bp-empty">
+                                        <td colSpan={7} className="bp-empty">
                                             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
                                             No examinees found for this filter.
                                         </td>
@@ -630,6 +942,7 @@ export default function BoardPasserPage() {
                                                     <div className="bp-name-sub">{r.sex}</div>
                                                 </td>
                                                 <td className="bp-td-course">{r.firstCourse}</td>
+                                                <td className="bp-td-course">{r.secondCourse || '—'}</td>
                                                 <td className="bp-td-room">
                                                     <span className={`bp-room-tag ${r.room === 'avr' ? 'bp-room-avr' : 'bp-room-comlab'}`}>
                                                         {r.room === 'avr' ? 'AVR' : r.room === 'comlab-2' ? 'Lab 2' : r.room || '—'}
