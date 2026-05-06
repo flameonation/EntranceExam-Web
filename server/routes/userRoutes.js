@@ -4,8 +4,6 @@ const User = require("../models/User");
 
 router.post("/register", async (req, res) => {
     try {
-        console.log("INCOMING BODY:", req.body);
-
         const existingUser = await User.findOne({ name: req.body.name, dob: req.body.dob });
         if (existingUser) {
             return res.status(400).json({ error: "User already registered with this name and birthdate." });
@@ -29,10 +27,8 @@ router.post("/register", async (req, res) => {
         });
 
         await newUser.save();
-        console.log("SAVED USER:", newUser);
         res.status(201).json({ message: "Success", user: newUser });
     } catch (err) {
-        console.log("SAVE ERROR:", err.message);
         res.status(500).json({ error: err.message });
     }
 });
@@ -49,10 +45,61 @@ router.get("/", async (req, res) => {
 router.get("/rooms", async (req, res) => {
     try {
         const users = await User.find(
-            { room: { $in: ['avr', 'comlab-2'] } },
+            { room: { $in: ["avr", "comlab-2"] } },
             { room: 1, sex: 1, transferee: 1, _id: 0 }
         ).sort({ createdAt: -1 });
         res.json(users);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.put("/:id", async (req, res) => {
+    try {
+        const {
+            name, dob, sex, contact, pob, address,
+            firstCourse, secondCourse,
+            lastSchool, lastSchoolAddress,
+            transferee, transfereeCourse,
+            guardian, room,
+        } = req.body;
+
+        const updated = await User.findByIdAndUpdate(
+            req.params.id,
+            {
+                $set: {
+                    name, dob, sex, contact, pob, address,
+                    firstCourse, secondCourse,
+                    lastSchool, lastSchoolAddress,
+                    transferee, transfereeCourse,
+                    guardian, room,
+                },
+            },
+            { new: true, runValidators: true }
+        );
+
+        if (!updated) {
+            return res.status(404).json({ error: "User not found" });
+        }
+
+        res.json({ message: "Updated", user: updated });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.delete("/:id", async (req, res) => {
+    try {
+        const deleted = await User.findByIdAndDelete(req.params.id);
+
+        if (!deleted) {
+            return res.status(404).json({ error: "User not found" });
+        }
+
+        const Result = require("../models/Result");
+        await Result.deleteMany({ userId: req.params.id });
+
+        res.json({ message: "User and associated results deleted successfully" });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

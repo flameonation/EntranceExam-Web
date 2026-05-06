@@ -16,4 +16,4 @@ router.post('/boardpasser-lock', (req, res) => {
     res.json({ locked: lockState.boardPasserLocked });
 });
 
-module.exports = router;
+module.exports = router;    
