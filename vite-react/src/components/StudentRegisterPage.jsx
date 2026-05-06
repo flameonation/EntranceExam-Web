@@ -27,6 +27,7 @@ export default function StudentRegisterPage({ room }) {
     const [showText, setShowText] = useState(true);
     const [isAllowed, setIsAllowed] = useState(true);
     const [showCourseModal, setShowCourseModal] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
         document.title = `Register (${room})`;
@@ -86,6 +87,8 @@ export default function StudentRegisterPage({ room }) {
     async function handleSubmit(e) {
         e.preventDefault();
 
+        if (isSubmitting) return;
+
         const hasFirst = form.firstCourse !== "";
         const hasSecond = form.secondCourse !== "";
 
@@ -93,6 +96,8 @@ export default function StudentRegisterPage({ room }) {
             setShowCourseModal(true);
             return;
         }
+
+        setIsSubmitting(true);
 
         try {
             const API_URL = import.meta.env.VITE_API_URL;
@@ -108,11 +113,13 @@ export default function StudentRegisterPage({ room }) {
                 data = JSON.parse(text);
             } catch {
                 Swal.fire("Error", "Server returned invalid response", "error");
+                setIsSubmitting(false);
                 return;
             }
 
             if (!res.ok) {
                 Swal.fire("Already Registered", data.error, "warning");
+                setIsSubmitting(false);
                 return;
             }
 
@@ -130,6 +137,7 @@ export default function StudentRegisterPage({ room }) {
             });
         } catch (err) {
             Swal.fire("Error", err.message, "error");
+            setIsSubmitting(false);
         }
     }
 
@@ -416,7 +424,20 @@ export default function StudentRegisterPage({ room }) {
                         </div>
                     </div>
 
-                    <button type="submit" className="srp-submit-btn">Start Examination</button>
+                    <button
+                        type="submit"
+                        className={`srp-submit-btn ${isSubmitting ? 'srp-btn-loading' : ''}`}
+                        disabled={isSubmitting}
+                    >
+                        {isSubmitting ? (
+                            <span className="btn-loading-inner">
+                                <span className="btn-spinner"></span>
+                                Processing...
+                            </span>
+                        ) : (
+                            "Start Examination"
+                        )}
+                    </button>
                 </form>
             </div>
 

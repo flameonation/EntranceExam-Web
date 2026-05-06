@@ -20,6 +20,7 @@ export default function Examination() {
     const [showModal, setShowModal] = useState(false);
     const [subjectOrder, setSubjectOrder] = useState([]);
     const [timeLeft, setTimeLeft] = useState(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const timerRef = useRef(null);
     const hasAutoSubmitted = useRef(false);
 
@@ -140,7 +141,7 @@ export default function Examination() {
     }
 
     async function finishExam() {
-        if (isExamFinished) return;
+        if (isExamFinished || isSubmitting) return;
 
         const unanswered = questions.filter(q => !answers[String(q._id)]);
         if (unanswered.length > 0) {
@@ -165,6 +166,8 @@ export default function Examination() {
             if (!confirm.isConfirmed) return;
         }
 
+        setIsSubmitting(true);
+
         try {
             const res = await fetch(`${API_URL}/api/exam/submit`, {
                 method: "POST",
@@ -183,9 +186,11 @@ export default function Examination() {
                 window.location.href = roomPath;
             } else {
                 Swal.fire("Error", data.message || "Submission failed.", "error");
+                setIsSubmitting(false);
             }
         } catch (err) {
             Swal.fire("Error", "Network error while submitting.", "error");
+            setIsSubmitting(false);
         }
     }
 
@@ -296,8 +301,19 @@ export default function Examination() {
                         ))}
 
                         <footer className="exam-only-footer">
-                            <button type="submit" className="final-submit">
-                                Finish Exam & Submit Answers
+                            <button
+                                type="submit"
+                                className={`final-submit ${isSubmitting ? 'btn-loading' : ''}`}
+                                disabled={isSubmitting}
+                            >
+                                {isSubmitting ? (
+                                    <span className="btn-loading-inner">
+                                        <span className="btn-spinner"></span>
+                                        Submitting...
+                                    </span>
+                                ) : (
+                                    "Finish Exam & Submit Answers"
+                                )}
                             </button>
                         </footer>
                     </div>

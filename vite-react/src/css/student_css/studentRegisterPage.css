@@ -661,3 +661,39 @@ html {
         max-width: 880px;
     }
 }
+
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.btn-loading-inner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.btn-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    border-top-color: #ffffff;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    flex-shrink: 0;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+
+.srp-submit-btn.srp-btn-loading,
+.srp-submit-btn:disabled {
+    opacity: 0.75;
+    cursor: not-allowed;
+    transform: none !important;
+    box-shadow: none;
+}
