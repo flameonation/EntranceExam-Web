@@ -20,7 +20,6 @@ export default function ResultsPage() {
     const itemsPerPage = 10;
 
     const API_URL = `${import.meta.env.VITE_API_URL}/api`;
-
     const adminRole = localStorage.getItem("admin_role");
     const isSuperAdmin = adminRole === 'superadmin';
 
@@ -49,20 +48,16 @@ export default function ResultsPage() {
 
     const sortedResults = useMemo(() => {
         let items = [...results];
-
         if (!isSuperAdmin && adminRole) {
             items = items.filter(r => r.userId?.room === adminRole);
         }
-
         if (filterDate) {
             items = items.filter(r => new Date(r.submittedAt).toISOString().split("T")[0] === filterDate);
         }
-
         if (searchQuery.trim()) {
             const q = searchQuery.toLowerCase();
             items = items.filter(r => r.userId?.name?.toLowerCase().includes(q));
         }
-
         items.sort((a, b) => {
             let valA, valB;
             if (sortConfig.key === 'name') {
@@ -76,7 +71,6 @@ export default function ResultsPage() {
             if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
             return 0;
         });
-
         return items;
     }, [results, filterDate, searchQuery, sortConfig, adminRole, isSuperAdmin]);
 
@@ -125,19 +119,16 @@ export default function ResultsPage() {
         try {
             const questionsRes = await axios.get(`${API_URL}/all-questions`);
             const allQuestions = questionsRes.data;
-
             const subjectMap = {};
             allQuestions.forEach(q => {
                 const subjectName = q.subjectId?.name || "General";
                 if (!subjectMap[subjectName]) subjectMap[subjectName] = [];
                 subjectMap[subjectName].push(q._id.toString());
             });
-
             const answerMap = {};
             result.answers.forEach(a => {
                 answerMap[a.questionId?.toString()] = a.isCorrect;
             });
-
             const scores = Object.entries(subjectMap).map(([subject, qIds]) => {
                 const saved = result.subjectScores?.find(
                     s => s.subject.toLowerCase() === subject.toLowerCase()
@@ -147,7 +138,6 @@ export default function ResultsPage() {
                     : qIds.filter(id => answerMap[id] === true).length;
                 return { subject, score, total: qIds.length };
             });
-
             setSubjectScores(scores);
             setEditingResult(result);
             setEditModalOpen(true);
@@ -172,11 +162,9 @@ export default function ResultsPage() {
                 score: newTotal,
                 subjectScores: subjectScores
             });
-
             setResults(prev => prev.map(r =>
                 r._id === editingResult._id ? res.data : r
             ));
-
             setEditModalOpen(false);
             setEditingResult(null);
             Swal.fire("Saved!", "Score updated successfully.", "success");
@@ -185,15 +173,25 @@ export default function ResultsPage() {
         }
     };
 
-    const roomLabel = adminRole === 'avr' ? 'AVR' : adminRole === 'comlab-2' ? 'Computer Laboratory 2' : null;
-
     const getPageNumbers = () => {
         const pages = [];
-        for (let i = 1; i <= totalPages; i++) {
-            pages.push(i);
+        const maxVisible = 3;
+        
+        if (totalPages <= 5) {
+            for (let i = 1; i <= totalPages; i++) pages.push(i);
+        } else {
+            if (currentPage <= 3) {
+                pages.push(1, 2, 3, '...', totalPages);
+            } else if (currentPage >= totalPages - 2) {
+                pages.push(1, '...', totalPages - 2, totalPages - 1, totalPages);
+            } else {
+                pages.push(1, '...', currentPage, '...', totalPages);
+            }
         }
         return pages;
     };
+
+    const roomLabel = adminRole === 'avr' ? 'AVR' : adminRole === 'comlab-2' ? 'Computer Laboratory 2' : null;
 
     return (
         <div className="kns-res-page">
@@ -323,11 +321,12 @@ export default function ResultsPage() {
                                 >
                                     <ChevronLeft size={16} />
                                 </button>
-                                {getPageNumbers().map(page => (
+                                {getPageNumbers().map((page, idx) => (
                                     <button
-                                        key={page}
-                                        className={`res-page-btn ${page === currentPage ? 'res-page-active' : ''}`}
-                                        onClick={() => setCurrentPage(page)}
+                                        key={idx}
+                                        className={`res-page-btn ${page === currentPage ? 'res-page-active' : ''} ${page === '...' ? 'res-page-dots' : ''}`}
+                                        onClick={() => typeof page === 'number' && setCurrentPage(page)}
+                                        disabled={page === '...'}
                                     >
                                         {page}
                                     </button>

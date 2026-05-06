@@ -23,7 +23,7 @@ router.post("/register", async (req, res) => {
             lastSchoolAddress: req.body.lastSchoolAddress,
             transferee: req.body.transferee,
             transfereeCourse: req.body.transfereeCourse,
-            room: req.body.room,
+            registerNumber: req.body.registerNumber,
         });
 
         await newUser.save();
@@ -57,7 +57,7 @@ router.get("/rooms", async (req, res) => {
 router.put("/:id", async (req, res) => {
     try {
         const {
-            name, dob, sex, contact, pob, address,
+            name, registerNumber, dob, sex, contact, pob, address,
             firstCourse, secondCourse,
             lastSchool, lastSchoolAddress,
             transferee, transfereeCourse,
@@ -68,7 +68,7 @@ router.put("/:id", async (req, res) => {
             req.params.id,
             {
                 $set: {
-                    name, dob, sex, contact, pob, address,
+                    name, registerNumber, dob, sex, contact, pob, address,
                     firstCourse, secondCourse,
                     lastSchool, lastSchoolAddress,
                     transferee, transfereeCourse,

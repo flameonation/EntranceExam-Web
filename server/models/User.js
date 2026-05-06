@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 
 const userSchema = new mongoose.Schema({
     name: { type: String, required: true, uppercase: true },
+    registerNumber: { type: String, required: true, unique: true },
     firstCourse: { type: String, required: true },
     secondCourse: { type: String },
     sex: { type: String, required: true },

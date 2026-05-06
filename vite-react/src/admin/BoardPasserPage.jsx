@@ -67,10 +67,9 @@ async function generateDocx({ groups, dateFilter, timeSlotFilter, viewMode, filt
     const fullDateLine = dateLine + timePart;
     const printedLine = `Printed: ${new Date().toLocaleString('en-PH')}`;
 
-    // Legal size: 8.5" × 14" (1 inch = 1440 twips)
-    const PAGE_WIDTH = 12240;   // 8.5"
-    const PAGE_HEIGHT = 20160;  // 14"
-    const MARGIN = 1080;        // 0.75"
+    const PAGE_WIDTH = 12240;
+    const PAGE_HEIGHT = 20160;
+    const MARGIN = 1080;
     const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
 
     const noBorder = { style: BorderStyle.NONE, size: 0, color: 'auto' };
@@ -109,17 +108,15 @@ async function generateDocx({ groups, dateFilter, timeSlotFilter, viewMode, filt
     }
 
     function makeTable(students, showBracket) {
-        // Legal 8.5" wide with 0.75" margins = 7" content
-        // Columns: #, Name, 1st Course, 2nd Course, Score[, Bracket]
         const colWidths = showBracket
-            ? [400, 2200, 2500, 2500, 700, 1780]
-            : [400, 2400, 3000, 3000, 780, 500];
+            ? [400, 1800, 1000, 2000, 2000, 700, 1580]
+            : [400, 1900, 1100, 2200, 2200, 700, 500];
 
         const hdrLabels = showBracket
-            ? ['#', 'Name', '1st Course Choice', '2nd Course Choice', 'Score', 'Bracket']
-            : ['#', 'Name', '1st Course Choice', '2nd Course Choice', 'Score', ''];
+            ? ['#', 'Name', 'Reg No.', '1st Course Choice', '2nd Course Choice', 'Score', 'Bracket']
+            : ['#', 'Name', 'Reg No.', '1st Course Choice', '2nd Course Choice', 'Score', ''];
 
-        const SCORE_COL = 4;
+        const SCORE_COL = 5;
 
         const headerRow = new TableRow({
             tableHeader: true,
@@ -141,8 +138,8 @@ async function generateDocx({ groups, dateFilter, timeSlotFilter, viewMode, filt
             const fill = idx % 2 === 1 ? 'F8FAFB' : 'FFFFFF';
             const scoreColor = b.color.replace('#', '');
             const values = showBracket
-                ? [String(idx + 1), s.name || '—', s.firstCourse || '—', s.secondCourse || '—', String(s.score ?? 0), b.label]
-                : [String(idx + 1), s.name || '—', s.firstCourse || '—', s.secondCourse || '—', String(s.score ?? 0), ''];
+                ? [String(idx + 1), s.name || '—', s.regNumber || '—', s.firstCourse || '—', s.secondCourse || '—', String(s.score ?? 0), b.label]
+                : [String(idx + 1), s.name || '—', s.regNumber || '—', s.firstCourse || '—', s.secondCourse || '—', String(s.score ?? 0), ''];
 
             return new TableRow({
                 children: values.map((text, i) => new TableCell({
@@ -167,7 +164,7 @@ async function generateDocx({ groups, dateFilter, timeSlotFilter, viewMode, filt
 
         const totalRow = new TableRow({
             children: [new TableCell({
-                columnSpan: 6,
+                columnSpan: 7,
                 width: { size: CONTENT_WIDTH, type: WidthType.DXA },
                 shading: { fill: 'FFFFFF', type: ShadingType.CLEAR },
                 borders: { top: darkBorder, bottom: noBorder, left: noBorder, right: noBorder },
@@ -274,7 +271,7 @@ function BracketPage({ group, dateFilter, timeSlotFilter, isLast }) {
                     ))}
                 </tbody>
                 <tfoot>
-                    <tr><td colSpan={5} className="bp-pt-foot">Total: {group.students.length} examinee{group.students.length !== 1 ? 's' : ''}</td></tr>
+                    <tr><td colSpan={6} className="bp-pt-foot">Total: {group.students.length} examinee{group.students.length !== 1 ? 's' : ''}</td></tr>
                 </tfoot>
             </table>
             <div className="bp-print-footer">
@@ -411,11 +408,11 @@ function FlatPrintView({ students, bracketFilter, letterFilter, onClose, dateFil
                             );
                         })}
                         {filtered.length === 0 && (
-                            <tr><td colSpan={6} className="bp-pt-empty">No records found.</td></tr>
+                            <tr><td colSpan={7} className="bp-pt-empty">No records found.</td></tr>
                         )}
                     </tbody>
                     <tfoot>
-                        <tr><td colSpan={6} className="bp-pt-foot">Total: {filtered.length} examinee{filtered.length !== 1 ? 's' : ''}</td></tr>
+                        <tr><td colSpan={7} className="bp-pt-foot">Total: {filtered.length} examinee{filtered.length !== 1 ? 's' : ''}</td></tr>
                     </tfoot>
                 </table>
                 <div className="bp-print-footer">
@@ -491,7 +488,7 @@ function AccordionSection({ bracket, students, globalSort, onSortChange }) {
                         <table className="bp-table">
                             <thead>
                                 <tr>
-                                    {['#', 'Name', '1st Course Choice', '2nd Course Choice', 'Room', 'Score'].map(h => (
+                                    {['#', 'Name', 'Reg No.', '1st Course Choice', '2nd Course Choice', 'Room', 'Score'].map(h => (
                                         <th key={h} style={{ textAlign: h === '#' || h === 'Score' ? 'center' : 'left' }}>{h}</th>
                                     ))}
                                 </tr>
@@ -504,6 +501,7 @@ function AccordionSection({ bracket, students, globalSort, onSortChange }) {
                                             <div className="bp-name-main">{r.name}</div>
                                             <div className="bp-name-sub">{r.sex}</div>
                                         </td>
+                                        <td className="bp-td-reg">{r.regNumber || '—'}</td>
                                         <td className="bp-td-course">{r.firstCourse}</td>
                                         <td className="bp-td-course">{r.secondCourse || '—'}</td>
                                         <td className="bp-td-room">
@@ -579,6 +577,7 @@ export default function BoardPasserPage() {
                 const merged = resultsData.map(r => ({
                     ...r,
                     name: r.userId?.name || '—',
+                    regNumber: r.userId?.registerNumber || '—',
                     firstCourse: r.userId?.firstCourse || '—',
                     secondCourse: r.userId?.secondCourse || '—',
                     sex: r.userId?.sex || '—',
@@ -642,7 +641,8 @@ export default function BoardPasserPage() {
             if (
                 !r.name?.toLowerCase().includes(q) &&
                 !r.firstCourse?.toLowerCase().includes(q) &&
-                !r.secondCourse?.toLowerCase().includes(q)
+                !r.secondCourse?.toLowerCase().includes(q) &&
+                !r.regNumber?.toLowerCase().includes(q) 
             ) return false;
         }
         return true;
@@ -917,7 +917,7 @@ export default function BoardPasserPage() {
                         <table className="bp-table">
                             <thead>
                                 <tr>
-                                    {['#', 'Name', '1st Course Choice', '2nd Course Choice', 'Room', 'Score', 'Bracket'].map(h => (
+                                    {['#', 'Name', 'Reg No.', '1st Course Choice', '2nd Course Choice', 'Room', 'Score', 'Bracket'].map(h => (
                                         <th key={h} style={{ textAlign: h === '#' || h === 'Score' ? 'center' : 'left' }}>{h}</th>
                                     ))}
                                 </tr>
@@ -925,7 +925,7 @@ export default function BoardPasserPage() {
                             <tbody>
                                 {paginated.length === 0 ? (
                                     <tr>
-                                        <td colSpan={7} className="bp-empty">
+                                        <td colSpan={8} className="bp-empty">
                                             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
                                             No examinees found for this filter.
                                         </td>
@@ -941,6 +941,7 @@ export default function BoardPasserPage() {
                                                     <div className="bp-name-main">{r.name}</div>
                                                     <div className="bp-name-sub">{r.sex}</div>
                                                 </td>
+                                                <td className="bp-td-reg">{r.regNumber || '—'}</td>
                                                 <td className="bp-td-course">{r.firstCourse}</td>
                                                 <td className="bp-td-course">{r.secondCourse || '—'}</td>
                                                 <td className="bp-td-room">
