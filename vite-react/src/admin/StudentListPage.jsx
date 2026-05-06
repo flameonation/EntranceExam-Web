@@ -83,6 +83,33 @@ export default function StudentListPage() {
         setCurrentPage(1);
     }, [filterDate, sortConfig]);
 
+    // ✅ Smart pagination with ellipsis
+    const getPageNumbers = () => {
+        const pages = [];
+        const delta = 2; // pages to show around current
+
+        if (totalPages <= 7) {
+            // Show all if total pages is small
+            for (let i = 1; i <= totalPages; i++) pages.push(i);
+            return pages;
+        }
+
+        pages.push(1); // Always show first
+
+        const left = Math.max(2, currentPage - delta);
+        const right = Math.min(totalPages - 1, currentPage + delta);
+
+        if (left > 2) pages.push("...");
+
+        for (let i = left; i <= right; i++) pages.push(i);
+
+        if (right < totalPages - 1) pages.push("...");
+
+        pages.push(totalPages); // Always show last
+
+        return pages;
+    };
+
     const generateWordDocument = async () => {
         const headerBorder = { style: BorderStyle.SINGLE, size: 2, color: "0c4222" };
 
@@ -223,13 +250,10 @@ export default function StudentListPage() {
                 cancelButtonText: "Cancel"
             });
 
-            if (!confirm.isConfirmed) {
-                return;
-            }
+            if (!confirm.isConfirmed) return;
         }
 
         setExporting(true);
-
         try {
             await generateWordDocument();
         } catch (err) {
@@ -241,14 +265,6 @@ export default function StudentListPage() {
     };
 
     const roomLabel = adminRole === 'avr' ? 'AVR' : adminRole === 'comlab-2' ? 'Computer Laboratory 2' : null;
-
-    const getPageNumbers = () => {
-        const pages = [];
-        for (let i = 1; i <= totalPages; i++) {
-            pages.push(i);
-        }
-        return pages;
-    };
 
     return (
         <div className="sl-page">
@@ -341,6 +357,7 @@ export default function StudentListPage() {
 
                         {totalPages > 1 && (
                             <div className="sl-pagination">
+                                {/* ✅ Previous Button */}
                                 <button
                                     className="sl-page-btn"
                                     onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
@@ -348,15 +365,23 @@ export default function StudentListPage() {
                                 >
                                     <ChevronLeft size={16} />
                                 </button>
-                                {getPageNumbers().map(page => (
-                                    <button
-                                        key={page}
-                                        className={`sl-page-btn ${page === currentPage ? 'sl-page-active' : ''}`}
-                                        onClick={() => setCurrentPage(page)}
-                                    >
-                                        {page}
-                                    </button>
-                                ))}
+
+                                {/* ✅ Smart Page Numbers with Ellipsis */}
+                                {getPageNumbers().map((page, idx) =>
+                                    page === "..." ? (
+                                        <span key={`ellipsis-${idx}`} className="sl-page-ellipsis">...</span>
+                                    ) : (
+                                        <button
+                                            key={page}
+                                            className={`sl-page-btn ${page === currentPage ? 'sl-page-active' : ''}`}
+                                            onClick={() => setCurrentPage(page)}
+                                        >
+                                            {page}
+                                        </button>
+                                    )
+                                )}
+
+                                {/* ✅ Next Button */}
                                 <button
                                     className="sl-page-btn"
                                     onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
