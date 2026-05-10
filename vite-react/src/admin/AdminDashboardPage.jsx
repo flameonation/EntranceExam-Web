@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './admincss/admindashboard.css';
 import knsLogo from '../assets/images/knslogo.png';
 import jpcsLogo from '../assets/images/JPCS.jpg';
@@ -8,55 +8,8 @@ import StudentListPage from './StudentListPage';
 import BoardPasserPage from './BoardPasserPage';
 import SettingsPage from './SettingsPage';
 import RegistersPage from './RegistersPage';
+import RoomsData from './RoomsData';
 import Swal from 'sweetalert2';
-import './admincss/RoomsData.css';
-
-
-const ROOMS = [
-    { id: 'avr', label: 'AVR', color: '#16a34a', glow: 'rgba(22,163,74,0.18)' },
-    { id: 'comlab-2', label: 'Computer Lab 2', color: '#0ea5e9', glow: 'rgba(14,165,233,0.18)' },
-];
-
-const RDChevronIcon = ({ open }) => (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-        style={{ transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.3s ease' }}>
-        <polyline points="6 9 12 15 18 9" />
-    </svg>
-);
-
-const RDUsersIcon = () => (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-        <circle cx="9" cy="7" r="4" />
-        <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-    </svg>
-);
-
-const RDMaleIcon = () => (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="10" cy="14" r="5" />
-        <line x1="19" y1="5" x2="14.14" y2="9.86" />
-        <polyline points="15 5 19 5 19 9" />
-    </svg>
-);
-
-const RDFemaleIcon = () => (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="12" cy="8" r="5" />
-        <line x1="12" y1="13" x2="12" y2="21" />
-        <line x1="9" y1="18" x2="15" y2="18" />
-    </svg>
-);
-
-const RDTransfereeIcon = () => (
-    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="17 1 21 5 17 9" />
-        <path d="M3 11V9a4 4 0 0 1 4-4h14" />
-        <polyline points="7 23 3 19 7 15" />
-        <path d="M21 13v2a4 4 0 0 1-4 4H3" />
-    </svg>
-);
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -67,454 +20,80 @@ function formatDateKey(dateStr) {
     return d.toISOString().slice(0, 10);
 }
 
-function formatDisplayDate(dateKey) {
-    if (!dateKey) return '—';
-    const d = new Date(dateKey + 'T00:00:00');
-    const day = DAY_NAMES[d.getDay()];
-    return `${day}, ${d.toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })}`;
+function SkeletonBlock({ width = '100%', height = '16px', radius = '6px', style = {} }) {
+    return (
+        <div style={{
+            width, height, borderRadius: radius,
+            background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)',
+            backgroundSize: '200% 100%',
+            animation: 'skeletonShimmer 1.4s infinite',
+            ...style
+        }} />
+    );
 }
 
-function DailyBreakdownTable({ students, roomFilter }) {
-    const filtered = roomFilter ? students.filter(s => s.room === roomFilter) : students;
+function OperationalOverview() {
+    const [enrichedResults, setEnrichedResults] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [viewMode, setViewMode] = useState('overall');
 
-    const byDay = {};
-    filtered.forEach(s => {
-        const key = formatDateKey(s.createdAt || s.registeredAt || s.dob);
-        if (!key) return;
-        if (!byDay[key]) byDay[key] = { total: 0, male: 0, female: 0, transferee: 0 };
-        byDay[key].total += 1;
-        if (s.sex === 'Male') byDay[key].male += 1;
-        if (s.sex === 'Female') byDay[key].female += 1;
-        if (s.transferee) byDay[key].transferee += 1;
+    const adminRole = localStorage.getItem("admin_role");
+    const isSuperAdmin = adminRole === 'superadmin';
+
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                const [resultsRes, usersRes] = await Promise.all([
+                    fetch(`${import.meta.env.VITE_API_URL}/api/all-results`),
+                    fetch(`${import.meta.env.VITE_API_URL}/api/users`)
+                ]);
+                if (!resultsRes.ok || !usersRes.ok) throw new Error();
+                const resultsData = await resultsRes.json();
+                const usersData = await usersRes.json();
+
+                const userMap = {};
+                usersData.forEach(u => { userMap[u._id] = u; });
+
+                const merged = resultsData.map(r => {
+                    const user = userMap[r.userId?._id || r.userId] || {};
+                    return {
+                        _id: r._id,
+                        name: user.name || '—',
+                        room: user.room || '—',
+                        sex: user.sex || '—',
+                        score: r.score,
+                        totalQuestions: r.totalQuestions,
+                        subjectScores: r.subjectScores || [],
+                        submittedAt: r.submittedAt || r.createdAt || null,
+                    };
+                });
+                setEnrichedResults(merged);
+            } catch {
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+    }, []);
+
+    const todayKey = new Date().toISOString().slice(0, 10);
+    const todayDayName = DAY_NAMES[new Date().getDay()];
+
+    const allFiltered = isSuperAdmin ? enrichedResults : enrichedResults.filter(r => r.room === adminRole);
+    const todayFiltered = allFiltered.filter(r => {
+        if (!r.submittedAt) return false;
+        return new Date(r.submittedAt).toISOString().slice(0, 10) === todayKey;
     });
 
-    const days = Object.keys(byDay).sort((a, b) => b.localeCompare(a));
+    const activeResults = viewMode === 'overall' ? allFiltered : todayFiltered;
 
-    if (days.length === 0) {
-        return (
-            <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: '13px' }}>
-                No daily data available yet.
-            </div>
-        );
-    }
-
-    return (
-        <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                <thead>
-                    <tr style={{ background: '#f8fafb' }}>
-                        {['Day / Date', 'Total', 'Male', 'Female', 'Transferees'].map(h => (
-                            <th key={h} style={{ padding: '10px 14px', textAlign: h === 'Day / Date' ? 'left' : 'center', fontSize: '10px', fontWeight: 700, letterSpacing: '1px', color: '#64748b', textTransform: 'uppercase', borderBottom: '1px solid #e2e8f0' }}>{h}</th>
-                        ))}
-                    </tr>
-                </thead>
-                <tbody>
-                    {days.map((day, idx) => {
-                        const row = byDay[day];
-                        return (
-                            <tr key={day} style={{ background: idx % 2 === 0 ? '#ffffff' : '#f8fafb', borderBottom: '1px solid #e2e8f0' }}>
-                                <td style={{ padding: '10px 14px', fontWeight: 600, color: '#0f172a' }}>{formatDisplayDate(day)}</td>
-                                <td style={{ padding: '10px 14px', textAlign: 'center', fontWeight: 700, color: '#16a34a', fontSize: '15px' }}>{row.total}</td>
-                                <td style={{ padding: '10px 14px', textAlign: 'center', color: '#0ea5e9', fontWeight: 600 }}>{row.male}</td>
-                                <td style={{ padding: '10px 14px', textAlign: 'center', color: '#ec4899', fontWeight: 600 }}>{row.female}</td>
-                                <td style={{ padding: '10px 14px', textAlign: 'center', color: '#8b5cf6', fontWeight: 600 }}>{row.transferee}</td>
-                            </tr>
-                        );
-                    })}
-                </tbody>
-                <tfoot>
-                    <tr style={{ background: '#f0fdf4', borderTop: '2px solid #bbf7d0' }}>
-                        <td style={{ padding: '10px 14px', fontWeight: 700, color: '#064e3b', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Grand Total</td>
-                        <td style={{ padding: '10px 14px', textAlign: 'center', fontWeight: 800, color: '#16a34a', fontSize: '16px' }}>{filtered.length}</td>
-                        <td style={{ padding: '10px 14px', textAlign: 'center', fontWeight: 700, color: '#0ea5e9' }}>{filtered.filter(s => s.sex === 'Male').length}</td>
-                        <td style={{ padding: '10px 14px', textAlign: 'center', fontWeight: 700, color: '#ec4899' }}>{filtered.filter(s => s.sex === 'Female').length}</td>
-                        <td style={{ padding: '10px 14px', textAlign: 'center', fontWeight: 700, color: '#8b5cf6' }}>{filtered.filter(s => s.transferee).length}</td>
-                    </tr>
-                </tfoot>
-            </table>
-        </div>
-    );
-}
-
-function RoomsData() {
-    const [students, setStudents] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const [expandedRooms, setExpandedRooms] = useState({});
-    const [expandedStudents, setExpandedStudents] = useState({});
-    const [searchQuery, setSearchQuery] = useState('');
-    const [activeView, setActiveView] = useState('rooms');
-    // ── Date filter: default to today ───────────────────────────────────────
-    const todayISO = new Date().toISOString().slice(0, 10);
-    const [filterDate, setFilterDate] = useState(todayISO);
-
-    const adminRole = localStorage.getItem("admin_role");
-    const isSuperAdmin = adminRole === 'superadmin';
-
-    const visibleRooms = isSuperAdmin
-        ? ROOMS
-        : ROOMS.filter(r => r.id === adminRole);
-
-    useEffect(() => {
-        const fetchStudents = async () => {
-            try {
-                setLoading(true);
-                const res = await fetch(`${import.meta.env.VITE_API_URL}/api/users`);
-                if (!res.ok) throw new Error('Failed to fetch students');
-                const data = await res.json();
-                setStudents(data);
-            } catch (err) {
-                setError(err.message);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchStudents();
-    }, []);
-
-    const toggleRoom = (roomId) => setExpandedRooms(prev => ({ ...prev, [roomId]: !prev[roomId] }));
-    const toggleStudent = (studentId) => setExpandedStudents(prev => ({ ...prev, [studentId]: !prev[studentId] }));
-
-    // ── Apply date filter + search to a room's students ─────────────────────
-    const getStudentsByRoom = (roomId) => {
-        return students.filter(s => {
-            if (s.room !== roomId) return false;
-            if (!isSuperAdmin && s.room !== adminRole) return false;
-
-            // Date filter
-            if (filterDate) {
-                const regKey = formatDateKey(s.createdAt || s.registeredAt);
-                if (regKey !== filterDate) return false;
-            }
-
-            // Search filter
-            if (searchQuery.trim()) {
-                const q = searchQuery.toLowerCase();
-                return (
-                    s.name?.toLowerCase().includes(q) ||
-                    s.firstCourse?.toLowerCase().includes(q) ||
-                    s.lastSchool?.toLowerCase().includes(q)
-                );
-            }
-            return true;
-        });
-    };
-
-    // Stats bar always reflects the date-filtered + role-filtered set
-    const roleStudents = (isSuperAdmin ? students : students.filter(s => s.room === adminRole))
-        .filter(s => !filterDate || formatDateKey(s.createdAt || s.registeredAt) === filterDate);
-
-    const totalExaminees = roleStudents.length;
-    const totalMale = roleStudents.filter(s => s.sex === 'Male').length;
-    const totalFemale = roleStudents.filter(s => s.sex === 'Female').length;
-    const totalTransferee = roleStudents.filter(s => s.transferee).length;
-
-    const formatDate = (dob) => {
-        if (!dob) return '—';
-        const d = new Date(dob);
-        return d.toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' });
-    };
-
-    const getAge = (dob) => {
-        if (!dob) return '—';
-        const birth = new Date(dob);
-        const today = new Date();
-        let age = today.getFullYear() - birth.getFullYear();
-        const m = today.getMonth() - birth.getMonth();
-        if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
-        return age;
-    };
-
-    const isToday = filterDate === todayISO;
-    const filterLabel = filterDate
-        ? (isToday ? 'Today' : formatDisplayDate(filterDate))
-        : 'All Dates';
-
-    return (
-        <div className="rd-root">
-            <div className="rd-header-strip">
-                <div className="rd-header-left">
-                    <h1 className="rd-title">Rooms Data</h1>
-                    <p className="rd-subtitle">
-                        {isSuperAdmin ? 'Live examinee count per room' : `Live examinee count — ${adminRole === 'avr' ? 'AVR' : 'Computer Lab 2'}`}
-                    </p>
-                </div>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                    {/* View toggle */}
-                    <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: '8px', padding: '3px', gap: '2px' }}>
-                        <button onClick={() => setActiveView('rooms')} style={{ padding: '6px 14px', borderRadius: '6px', border: 'none', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', background: activeView === 'rooms' ? '#ffffff' : 'transparent', color: activeView === 'rooms' ? '#0f172a' : '#64748b', boxShadow: activeView === 'rooms' ? '0 1px 4px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.15s' }}>Rooms View</button>
-                        <button onClick={() => setActiveView('daily')} style={{ padding: '6px 14px', borderRadius: '6px', border: 'none', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', background: activeView === 'daily' ? '#ffffff' : 'transparent', color: activeView === 'daily' ? '#0f172a' : '#64748b', boxShadow: activeView === 'daily' ? '0 1px 4px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.15s' }}>Daily Totals</button>
-                    </div>
-
-                    {/* ── Date filter (Rooms View only) ───────────────────── */}
-                    {activeView === 'rooms' && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f1f5f9', borderRadius: '8px', padding: '4px 10px 4px 8px', border: filterDate && !isToday ? '1.5px solid #16a34a' : '1.5px solid transparent', transition: 'border-color 0.15s' }}>
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={filterDate && !isToday ? '#16a34a' : '#94a3b8'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <rect width="18" height="18" x="3" y="4" rx="2" ry="2" />
-                                <line x1="16" x2="16" y1="2" y2="6" /><line x1="8" x2="8" y1="2" y2="6" /><line x1="3" x2="21" y1="10" y2="10" />
-                            </svg>
-                            <input
-                                type="date"
-                                value={filterDate}
-                                onChange={e => setFilterDate(e.target.value)}
-                                style={{ border: 'none', background: 'transparent', fontSize: '12px', fontWeight: 600, color: filterDate && !isToday ? '#16a34a' : '#0f172a', outline: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
-                            />
-                            {filterDate && (
-                                <button
-                                    onClick={() => setFilterDate('')}
-                                    title="Show all dates"
-                                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 0 2px', display: 'flex', alignItems: 'center', color: '#94a3b8', lineHeight: 1 }}
-                                >
-                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                        <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                                    </svg>
-                                </button>
-                            )}
-                        </div>
-                    )}
-
-                    {activeView === 'rooms' && (
-                        <div className="rd-search-box">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
-                            </svg>
-                            <input className="rd-search-input" placeholder="Search name, course, school…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {/* ── Active filter banner ─────────────────────────────────────── */}
-            {activeView === 'rooms' && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 14px', background: isToday ? '#f0fdf4' : filterDate ? '#fffbeb' : '#f8fafb', border: `1px solid ${isToday ? '#bbf7d0' : filterDate ? '#fde68a' : '#e2e8f0'}`, borderRadius: '10px', marginBottom: '4px', fontSize: '12px', fontWeight: 600, color: isToday ? '#15803d' : filterDate ? '#92400e' : '#64748b' }}>
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="12" /><line x1="12" x2="12.01" y1="16" y2="16" />
-                    </svg>
-                    {filterDate
-                        ? <>Showing examinees registered on <strong style={{ marginLeft: '3px' }}>{filterLabel}</strong> — {totalExaminees} found</>
-                        : <>Showing <strong>all registered examinees</strong> — {totalExaminees} total</>
-                    }
-                    {!filterDate && (
-                        <button onClick={() => setFilterDate(todayISO)} style={{ marginLeft: 'auto', fontSize: '11px', fontWeight: 700, color: '#16a34a', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-                            Jump to Today
-                        </button>
-                    )}
-                </div>
-            )}
-
-            <div className="rd-stats-row">
-                <div className="rd-stat-card rd-stat-total">
-                    <div className="rd-stat-icon"><RDUsersIcon /></div>
-                    <div className="rd-stat-body">
-                        <span className="rd-stat-num">{totalExaminees}</span>
-                        <span className="rd-stat-lbl">{filterDate ? `${isToday ? "Today's" : "Day's"} Examinees` : 'Total Examinees'}</span>
-                    </div>
-                </div>
-                <div className="rd-stat-card rd-stat-male">
-                    <div className="rd-stat-icon"><RDMaleIcon /></div>
-                    <div className="rd-stat-body">
-                        <span className="rd-stat-num">{totalMale}</span>
-                        <span className="rd-stat-lbl">Male</span>
-                    </div>
-                </div>
-                <div className="rd-stat-card rd-stat-female">
-                    <div className="rd-stat-icon"><RDFemaleIcon /></div>
-                    <div className="rd-stat-body">
-                        <span className="rd-stat-num">{totalFemale}</span>
-                        <span className="rd-stat-lbl">Female</span>
-                    </div>
-                </div>
-                <div className="rd-stat-card rd-stat-transferee">
-                    <div className="rd-stat-icon"><RDTransfereeIcon /></div>
-                    <div className="rd-stat-body">
-                        <span className="rd-stat-num">{totalTransferee}</span>
-                        <span className="rd-stat-lbl">Transferees</span>
-                    </div>
-                </div>
-            </div>
-
-            {loading && (
-                <div className="rd-loading">
-                    <div className="rd-spinner" />
-                    <span>Loading room data…</span>
-                </div>
-            )}
-
-            {error && (
-                <div className="rd-error">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="12" /><line x1="12" x2="12.01" y1="16" y2="16" /></svg>
-                    {error}
-                </div>
-            )}
-
-            {!loading && !error && activeView === 'daily' && (
-                <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '14px', overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-                    <div style={{ padding: '16px 20px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div style={{ width: '3px', height: '16px', background: '#16a34a', borderRadius: '2px' }} />
-                        <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
-                            {isSuperAdmin ? 'All Rooms — Daily Examinee Totals' : `${adminRole === 'avr' ? 'AVR' : 'Computer Lab 2'} — Daily Examinee Totals`}
-                        </span>
-                    </div>
-                    {isSuperAdmin ? (
-                        <div>
-                            {ROOMS.map((room, idx) => (
-                                <div key={room.id} style={{ borderBottom: idx < ROOMS.length - 1 ? '1px solid #e2e8f0' : 'none' }}>
-                                    <div style={{ padding: '10px 20px', background: '#f8fafb', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid #e2e8f0' }}>
-                                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: room.color }} />
-                                        <span style={{ fontSize: '12px', fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{room.label}</span>
-                                    </div>
-                                    <DailyBreakdownTable students={students} roomFilter={room.id} />
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <DailyBreakdownTable students={students} roomFilter={adminRole} />
-                    )}
-                </div>
-            )}
-
-            {!loading && !error && activeView === 'rooms' && (
-                <div className="rd-rooms-list">
-                    {visibleRooms.map(room => {
-                        const roomStudents = getStudentsByRoom(room.id);
-                        const isOpen = expandedRooms[room.id];
-                        const maleCount = roomStudents.filter(s => s.sex === 'Male').length;
-                        const femaleCount = roomStudents.filter(s => s.sex === 'Female').length;
-                        const transfereeCount = roomStudents.filter(s => s.transferee).length;
-
-                        return (
-                            <div className={`rd-room-card ${isOpen ? 'rd-room-open' : ''}`} key={room.id} style={{ '--room-color': room.color, '--room-glow': room.glow }}>
-                                <button className="rd-room-header" onClick={() => toggleRoom(room.id)}>
-                                    <div className="rd-room-dot" />
-                                    <div className="rd-room-info">
-                                        <span className="rd-room-name">{room.label}</span>
-                                        <div className="rd-room-pills">
-                                            <span className="rd-pill rd-pill-male"><RDMaleIcon />{maleCount}M</span>
-                                            <span className="rd-pill rd-pill-female"><RDFemaleIcon />{femaleCount}F</span>
-                                            {transfereeCount > 0 && (
-                                                <span className="rd-pill rd-pill-transfer"><RDTransfereeIcon />{transfereeCount} Transfer</span>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <div className="rd-room-count-badge">
-                                        <span>{roomStudents.length}</span>
-                                        <small>examinees</small>
-                                    </div>
-                                    <div className="rd-chevron"><RDChevronIcon open={isOpen} /></div>
-                                </button>
-
-                                {isOpen && (
-                                    <div className="rd-room-body">
-                                        {roomStudents.length === 0 ? (
-                                            <div className="rd-empty-room">
-                                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                                                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                                                    <circle cx="9" cy="7" r="4" />
-                                                    <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-                                                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                                                </svg>
-                                                <p>{filterDate ? `No examinees registered on ${filterLabel}.` : 'No examinees registered in this room.'}</p>
-                                            </div>
-                                        ) : (
-                                            <div className="rd-student-list">
-                                                {roomStudents.map((s, idx) => {
-                                                    const isExpanded = expandedStudents[s._id];
-                                                    return (
-                                                        <div className={`rd-student-item ${isExpanded ? 'rd-student-expanded' : ''}`} key={s._id}>
-                                                            <button className="rd-student-row" onClick={() => toggleStudent(s._id)}>
-                                                                <div className="rd-student-num">{idx + 1}</div>
-                                                                <div className="rd-student-avatar" style={{ background: s.sex === 'Male' ? 'rgba(14,165,233,0.12)' : 'rgba(236,72,153,0.12)', color: s.sex === 'Male' ? '#0ea5e9' : '#ec4899' }}>
-                                                                    {s.sex === 'Male' ? <RDMaleIcon /> : <RDFemaleIcon />}
-                                                                </div>
-                                                                <div className="rd-student-main">
-                                                                    <span className="rd-student-name">{s.name}</span>
-                                                                    <span className="rd-student-course">{s.firstCourse}</span>
-                                                                </div>
-                                                                <div className="rd-student-meta">
-                                                                    {s.transferee && <span className="rd-transfer-badge"><RDTransfereeIcon />Transferee</span>}
-                                                                    {(s.createdAt || s.registeredAt) && (
-                                                                        <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 500 }}>
-                                                                            {new Date(s.createdAt || s.registeredAt).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                                                        </span>
-                                                                    )}
-                                                                    <span className="rd-student-age">{getAge(s.dob)} yrs</span>
-                                                                </div>
-                                                                <div className="rd-expand-icon"><RDChevronIcon open={isExpanded} /></div>
-                                                            </button>
-
-                                                            {isExpanded && (
-                                                                <div className="rd-student-details">
-                                                                    <div className="rd-detail-grid">
-                                                                        <div className="rd-detail-block"><span className="rd-detail-label">Date of Birth</span><span className="rd-detail-value">{formatDate(s.dob)}</span></div>
-                                                                        <div className="rd-detail-block"><span className="rd-detail-label">Place of Birth</span><span className="rd-detail-value">{s.pob || '—'}</span></div>
-                                                                        <div className="rd-detail-block"><span className="rd-detail-label">Contact</span><span className="rd-detail-value">{s.contact}</span></div>
-                                                                        <div className="rd-detail-block"><span className="rd-detail-label">Address</span><span className="rd-detail-value">{s.address}</span></div>
-                                                                        <div className="rd-detail-block"><span className="rd-detail-label">2nd Course Choice</span><span className="rd-detail-value">{s.secondCourse || '—'}</span></div>
-                                                                        <div className="rd-detail-block"><span className="rd-detail-label">Last School</span><span className="rd-detail-value">{s.lastSchool}</span></div>
-                                                                        <div className="rd-detail-block"><span className="rd-detail-label">School Address</span><span className="rd-detail-value">{s.lastSchoolAddress || '—'}</span></div>
-                                                                        <div className="rd-detail-block"><span className="rd-detail-label">Guardian</span><span className="rd-detail-value">{s.guardian}</span></div>
-                                                                        {(s.createdAt || s.registeredAt) && (
-                                                                            <div className="rd-detail-block"><span className="rd-detail-label">Registered On</span><span className="rd-detail-value">{formatDisplayDate(formatDateKey(s.createdAt || s.registeredAt))}</span></div>
-                                                                        )}
-                                                                        {s.transferee && (
-                                                                            <div className="rd-detail-block"><span className="rd-detail-label">Previous Course</span><span className="rd-detail-value">{s.transfereeCourse || '—'}</span></div>
-                                                                        )}
-                                                                    </div>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })}
-                </div>
-            )}
-        </div>
-    );
-}
-
-// ════════════════════════════════════════════════════════════════════════════
-// OperationalOverview — reads from /api/users (registered students), NOT results
-// ════════════════════════════════════════════════════════════════════════════
-function OperationalOverview() {
-    const [students, setStudents] = useState([]);
-    const [loading, setLoading] = useState(true);
-
-    const adminRole = localStorage.getItem("admin_role");
-    const isSuperAdmin = adminRole === 'superadmin';
-
-    useEffect(() => {
-        const fetchStudents = async () => {
-            try {
-                // Always fetch from /api/users so we count registered students, not results
-                const res = await fetch(`${import.meta.env.VITE_API_URL}/api/users`);
-                if (!res.ok) throw new Error();
-                const data = await res.json();
-                setStudents(data);
-            } catch {
-                // silent
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchStudents();
-    }, []);
-
-    // Only count registered students (from /api/users)
-    const filteredStudents = isSuperAdmin ? students : students.filter(s => s.room === adminRole);
-
-    const total = filteredStudents.length;
+    const total = activeResults.length;
     const avrCount = isSuperAdmin
-        ? students.filter(s => s.room === 'avr').length
-        : (adminRole === 'avr' ? filteredStudents.length : 0);
+        ? activeResults.filter(r => r.room === 'avr').length
+        : (adminRole === 'avr' ? total : 0);
     const comlabCount = isSuperAdmin
-        ? students.filter(s => s.room === 'comlab-2').length
-        : (adminRole === 'comlab-2' ? filteredStudents.length : 0);
+        ? activeResults.filter(r => r.room === 'comlab-2').length
+        : (adminRole === 'comlab-2' ? total : 0);
     const avrPct = total > 0 ? Math.round((avrCount / total) * 100) : 0;
     const comlabPct = total > 0 ? Math.round((comlabCount / total) * 100) : 0;
 
@@ -533,29 +112,112 @@ function OperationalOverview() {
         ? `M ${cx} ${cy - r} A ${r} ${r} 0 1 1 ${cx - 0.01} ${cy - r} Z`
         : `M ${cx} ${cy} L ${x2} ${y2} A ${r} ${r} 0 ${1 - largeArc} 1 ${x1} ${y1} Z`;
 
-    if (loading) return (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px', gap: '10px', color: '#64748b', fontSize: '13px' }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'ov-spin 1s linear infinite' }}>
-                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-            </svg>
-            Loading overview...
+    const singleRoomColor = adminRole === 'avr' ? '#0ea5e9' : '#8b5cf6';
+    const singleRoomLabel = adminRole === 'avr' ? 'AVR' : 'Computer Lab 2';
+    const maleCount = activeResults.filter(r => r.sex === 'Male').length;
+    const femaleCount = activeResults.filter(r => r.sex === 'Female').length;
+    const avgScore = total > 0 ? Math.round(activeResults.reduce((a, r) => a + (r.score || 0), 0) / total) : 0;
+    const avgMax = total > 0 ? Math.round(activeResults.reduce((a, r) => a + (r.totalQuestions || 0), 0) / total) : 0;
+    const passCount = activeResults.filter(r => r.score >= (r.totalQuestions * 0.5)).length;
+    const passRate = total > 0 ? Math.round((passCount / total) * 100) : 0;
+
+    const TabToggle = () => (
+        <div style={{ display: 'flex', gap: '4px', background: '#f1f5f9', borderRadius: '10px', padding: '3px', width: 'fit-content' }}>
+            {[
+                { key: 'overall', label: 'Overall' },
+                { key: 'today', label: `Today — ${todayDayName}` },
+            ].map(tab => (
+                <button
+                    key={tab.key}
+                    onClick={() => setViewMode(tab.key)}
+                    style={{
+                        padding: '6px 14px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
+                        transition: 'all 0.18s',
+                        background: viewMode === tab.key ? '#ffffff' : 'transparent',
+                        color: viewMode === tab.key ? '#0f172a' : '#94a3b8',
+                        boxShadow: viewMode === tab.key ? '0 1px 4px rgba(0,0,0,0.10)' : 'none',
+                    }}
+                >
+                    {tab.label}
+                </button>
+            ))}
         </div>
     );
 
-    const singleRoomColor = adminRole === 'avr' ? '#0ea5e9' : '#8b5cf6';
-    const singleRoomLabel = adminRole === 'avr' ? 'AVR' : 'Computer Lab 2';
+    if (loading) {
+        return (
+            <div style={{ padding: '4px 0' }}>
+                {isSuperAdmin ? (
+                    <>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '12px', marginBottom: '20px' }}>
+                            {[0, 1, 2, 3].map(i => (
+                                <div key={i} style={{ background: '#f8fafb', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    <SkeletonBlock width="60%" height="10px" />
+                                    <SkeletonBlock width="40%" height="28px" radius="8px" />
+                                    <SkeletonBlock width="70%" height="10px" />
+                                </div>
+                            ))}
+                        </div>
+                        <div style={{ background: '#f8fafb', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '20px', display: 'flex', alignItems: 'center', gap: '32px' }}>
+                            <SkeletonBlock width="160px" height="160px" radius="50%" style={{ flexShrink: 0 }} />
+                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                {[0, 1].map(i => (
+                                    <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                        <SkeletonBlock width="50%" height="12px" />
+                                        <SkeletonBlock width="100%" height="8px" radius="99px" />
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </>
+                ) : (
+                    <>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
+                            {[0, 1].map(i => (
+                                <div key={i} style={{ background: '#f8fafb', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    <SkeletonBlock width="60%" height="10px" />
+                                    <SkeletonBlock width="40%" height="28px" radius="8px" />
+                                    <SkeletonBlock width="70%" height="10px" />
+                                </div>
+                            ))}
+                        </div>
+                        <div style={{ background: '#f8fafb', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            <SkeletonBlock width="50%" height="12px" />
+                            <SkeletonBlock width="100%" height="10px" radius="99px" />
+                        </div>
+                    </>
+                )}
+            </div>
+        );
+    }
 
     return (
         <div style={{ padding: '4px 0' }}>
-            <style>{`@keyframes ov-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+
+            {/* Tab Toggle */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                <TabToggle />
+                {viewMode === 'today' && (
+                    <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 500 }}>
+                        {todayFiltered.length} result{todayFiltered.length !== 1 ? 's' : ''} today
+                    </span>
+                )}
+            </div>
 
             {isSuperAdmin ? (
                 <>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '20px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '12px', marginBottom: '20px' }}>
                         {[
-                            { label: 'Total Registered', value: total, color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', sub: 'registered students' },
-                            { label: 'AVR', value: avrCount, color: '#0ea5e9', bg: '#f0f9ff', border: '#bae6fd', sub: `${avrPct}% of total` },
-                            { label: 'Computer Lab 2', value: comlabCount, color: '#8b5cf6', bg: '#faf5ff', border: '#ddd6fe', sub: `${comlabPct}% of total` },
+                            { label: 'Total Results', value: enrichedResults.length, color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', sub: 'all exam results in DB' },
+                            { label: viewMode === 'overall' ? 'Total Registered' : "Today's Results", value: total, color: '#059669', bg: '#ecfdf5', border: '#a7f3d0', sub: viewMode === 'overall' ? 'matched with users' : todayDayName },
+                            { label: 'AVR', value: avrCount, color: '#0ea5e9', bg: '#f0f9ff', border: '#bae6fd', sub: `${avrPct}% of ${viewMode === 'today' ? 'today' : 'total'}` },
+                            { label: 'Computer Lab 2', value: comlabCount, color: '#8b5cf6', bg: '#faf5ff', border: '#ddd6fe', sub: `${comlabPct}% of ${viewMode === 'today' ? 'today' : 'total'}` },
                         ].map(card => (
                             <div key={card.label} style={{ background: card.bg, border: `1px solid ${card.border}`, borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                 <span style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{card.label}</span>
@@ -577,7 +239,7 @@ function OperationalOverview() {
                                 )}
                                 <circle cx={cx} cy={cy} r={36} fill="#ffffff" />
                                 <text x={cx} y={cy - 6} textAnchor="middle" fontSize="18" fontWeight="800" fill="#0f172a">{total}</text>
-                                <text x={cx} y={cy + 12} textAnchor="middle" fontSize="9" fill="#94a3b8" fontWeight="600">REGISTERED</text>
+                                <text x={cx} y={cy + 12} textAnchor="middle" fontSize="9" fill="#94a3b8" fontWeight="600">RESULTS</text>
                             </svg>
                         </div>
                         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -600,77 +262,98 @@ function OperationalOverview() {
                                     </div>
                                 </div>
                             ))}
-                            {total === 0 && <p style={{ fontSize: '12px', color: '#94a3b8', margin: 0 }}>No students registered yet.</p>}
+                            {total === 0 && (
+                                <p style={{ fontSize: '12px', color: '#94a3b8', margin: 0 }}>
+                                    {viewMode === 'today' ? 'No results submitted today.' : 'No results found.'}
+                                </p>
+                            )}
                         </div>
                     </div>
                 </>
             ) : (
                 <>
-                    {(() => {
-                        const todayKey = new Date().toISOString().slice(0, 10);
-                        const todayDayName = DAY_NAMES[new Date().getDay()];
-                        const todayCount = filteredStudents.filter(s => {
-                            const key = formatDateKey(s.createdAt || s.registeredAt);
-                            return key === todayKey;
-                        }).length;
-                        const todayMale = filteredStudents.filter(s => {
-                            const key = formatDateKey(s.createdAt || s.registeredAt);
-                            return key === todayKey && s.sex === 'Male';
-                        }).length;
-                        const todayFemale = filteredStudents.filter(s => {
-                            const key = formatDateKey(s.createdAt || s.registeredAt);
-                            return key === todayKey && s.sex === 'Female';
-                        }).length;
-                        const barPct = total > 0 ? Math.round((todayCount / total) * 100) : 0;
-
-                        return (
-                            <>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
-                                    <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                        <span style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Registered</span>
-                                        <span style={{ fontSize: '28px', fontWeight: 800, color: '#16a34a', lineHeight: 1 }}>{total}</span>
-                                        <span style={{ fontSize: '11px', color: '#94a3b8' }}>registered in your room</span>
-                                    </div>
-                                    <div style={{ background: adminRole === 'avr' ? '#f0f9ff' : '#faf5ff', border: `1px solid ${adminRole === 'avr' ? '#bae6fd' : '#ddd6fe'}`, borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                        <span style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Today — {todayDayName}</span>
-                                        <span style={{ fontSize: '28px', fontWeight: 800, color: singleRoomColor, lineHeight: 1 }}>{todayCount}</span>
-                                        <span style={{ fontSize: '11px', color: '#94a3b8' }}>
-                                            {todayMale}M &nbsp;·&nbsp; {todayFemale}F &nbsp;·&nbsp; {barPct}% of total
-                                        </span>
-                                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
+                        <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <span style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                {viewMode === 'overall' ? 'Total Results' : "Today's Results"}
+                            </span>
+                            <span style={{ fontSize: '28px', fontWeight: 800, color: '#16a34a', lineHeight: 1 }}>{total}</span>
+                            <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+                                {viewMode === 'overall' ? 'exam results in your room' : `submitted on ${todayDayName}`}
+                            </span>
+                        </div>
+                        <div style={{ background: adminRole === 'avr' ? '#f0f9ff' : '#faf5ff', border: `1px solid ${adminRole === 'avr' ? '#bae6fd' : '#ddd6fe'}`, borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <span style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Avg Score</span>
+                            <span style={{ fontSize: '28px', fontWeight: 800, color: singleRoomColor, lineHeight: 1 }}>
+                                {avgScore}<span style={{ fontSize: '14px', fontWeight: 500, color: '#94a3b8' }}>/{avgMax}</span>
+                            </span>
+                            <span style={{ fontSize: '11px', color: '#94a3b8' }}>average per examinee</span>
+                        </div>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '20px' }}>
+                        <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '12px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <span style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Male</span>
+                            <span style={{ fontSize: '24px', fontWeight: 800, color: '#0ea5e9', lineHeight: 1 }}>{maleCount}</span>
+                            <span style={{ fontSize: '11px', color: '#94a3b8' }}>{total > 0 ? Math.round((maleCount / total) * 100) : 0}% of {viewMode === 'today' ? 'today' : 'total'}</span>
+                        </div>
+                        <div style={{ background: '#fdf2f8', border: '1px solid #fbcfe8', borderRadius: '12px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <span style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Female</span>
+                            <span style={{ fontSize: '24px', fontWeight: 800, color: '#ec4899', lineHeight: 1 }}>{femaleCount}</span>
+                            <span style={{ fontSize: '11px', color: '#94a3b8' }}>{total > 0 ? Math.round((femaleCount / total) * 100) : 0}% of {viewMode === 'today' ? 'today' : 'total'}</span>
+                        </div>
+                        <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '12px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <span style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Pass Rate</span>
+                            <span style={{ fontSize: '24px', fontWeight: 800, color: '#d97706', lineHeight: 1 }}>{passRate}%</span>
+                            <span style={{ fontSize: '11px', color: '#94a3b8' }}>≥50% score</span>
+                        </div>
+                    </div>
+                    <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '20px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                                <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: singleRoomColor }} />
+                                <span style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a' }}>
+                                    {singleRoomLabel} — {viewMode === 'overall' ? 'All-time Results' : `Today (${todayDayName})`}
+                                </span>
+                            </div>
+                            <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+                                {viewMode === 'today' ? 'Overall: ' : 'Total: '}
+                                <strong style={{ color: '#0f172a' }}>
+                                    {viewMode === 'today' ? allFiltered.length : total}
+                                </strong>
+                            </span>
+                        </div>
+                        <div style={{ height: '10px', background: '#f1f5f9', borderRadius: '99px', overflow: 'hidden', marginBottom: '10px' }}>
+                            <div style={{
+                                height: '100%',
+                                width: viewMode === 'today' && allFiltered.length > 0
+                                    ? `${Math.round((total / allFiltered.length) * 100)}%`
+                                    : total > 0 ? '100%' : '0%',
+                                background: singleRoomColor,
+                                borderRadius: '99px',
+                                transition: 'width 0.6s ease',
+                            }} />
+                        </div>
+                        <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                            {[
+                                { label: 'Male', value: maleCount, color: '#0ea5e9' },
+                                { label: 'Female', value: femaleCount, color: '#ec4899' },
+                                { label: 'Avg Score', value: `${avgScore}/${avgMax}`, color: singleRoomColor },
+                                { label: 'Pass Rate', value: `${passRate}%`, color: '#d97706' },
+                                { label: viewMode === 'today' ? "Today's Total" : 'Total', value: total, color: '#16a34a' },
+                            ].map(item => (
+                                <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                    <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: item.color, flexShrink: 0 }} />
+                                    <span style={{ fontSize: '11px', color: '#64748b' }}>{item.label}:</span>
+                                    <span style={{ fontSize: '12px', fontWeight: 700, color: item.color }}>{item.value}</span>
                                 </div>
-                                <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '20px' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                                            <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: singleRoomColor }} />
-                                            <span style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a' }}>{singleRoomLabel}</span>
-                                        </div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                            <span style={{ fontSize: '11px', color: '#94a3b8' }}>Today: <strong style={{ color: singleRoomColor }}>{todayCount}</strong></span>
-                                            <span style={{ fontSize: '11px', color: '#94a3b8' }}>Total Registered: <strong style={{ color: '#0f172a' }}>{total}</strong></span>
-                                        </div>
-                                    </div>
-                                    <div style={{ height: '10px', background: '#f1f5f9', borderRadius: '99px', overflow: 'hidden', marginBottom: '10px' }}>
-                                        <div style={{ height: '100%', width: `${barPct}%`, background: singleRoomColor, borderRadius: '99px', transition: 'width 0.6s ease' }} />
-                                    </div>
-                                    <div style={{ display: 'flex', gap: '16px' }}>
-                                        {[
-                                            { label: 'Male today', value: todayMale, color: '#0ea5e9' },
-                                            { label: 'Female today', value: todayFemale, color: '#ec4899' },
-                                            { label: 'All-time registered', value: total, color: '#16a34a' },
-                                        ].map(item => (
-                                            <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                                <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: item.color, flexShrink: 0 }} />
-                                                <span style={{ fontSize: '11px', color: '#64748b' }}>{item.label}:</span>
-                                                <span style={{ fontSize: '12px', fontWeight: 700, color: item.color }}>{item.value}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                    {total === 0 && <p style={{ fontSize: '12px', color: '#94a3b8', margin: '10px 0 0' }}>No students registered yet.</p>}
-                                </div>
-                            </>
-                        );
-                    })()}
+                            ))}
+                        </div>
+                        {total === 0 && (
+                            <p style={{ fontSize: '12px', color: '#94a3b8', margin: '10px 0 0' }}>
+                                {viewMode === 'today' ? 'No results submitted today.' : 'No results found for this room yet.'}
+                            </p>
+                        )}
+                    </div>
                 </>
             )}
         </div>
@@ -686,15 +369,16 @@ const Icon = ({ name }) => {
         results: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><path d="M12 11h.01" /><path d="M12 16h.01" /></svg>,
         boardPasser: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="6" /><path d="M8 14v7l4-2 4 2v-7" /><path d="m9 11 2 2 4-4" /></svg>,
         settings: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1-2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1Z" /></svg>,
-        logout: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" x2="9" y1="12" y2="12" /></svg>,
-        search: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>,
-        bell: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg>,
-        lock: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>,
-        registerStudent: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="16" y1="11" x2="22" y2="11"/></svg>,
+        logout: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" x2="9" y1="12" y2="12" /></svg>,
+        registerStudent: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><line x1="19" y1="8" x2="19" y2="14" /><line x1="16" y1="11" x2="22" y2="11" /></svg>,
+        lock: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>,
+        info: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="12" /><line x1="12" x2="12.01" y1="16" y2="16" /></svg>,
+        chevronRight: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>,
+        shield: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>,
+        user: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>,
     };
     return icons[name] || null;
 };
-
 
 const availableCourses = [
     "Bachelor of Science in Computer Science",
@@ -784,9 +468,7 @@ const PinGateModal = ({ onSuccess, onClose }) => {
     const [shake, setShake] = useState(false);
     const inputRefs = useRef([]);
 
-    useEffect(() => {
-        if (inputRefs.current[0]) inputRefs.current[0].focus();
-    }, []);
+    useEffect(() => { if (inputRefs.current[0]) inputRefs.current[0].focus(); }, []);
 
     const handleDigitChange = (index, value) => {
         const digit = value.replace(/\D/g, '').slice(-1);
@@ -803,26 +485,11 @@ const PinGateModal = ({ onSuccess, onClose }) => {
 
     const handleKeyDown = (index, e) => {
         if (e.key === 'Backspace') {
-            if (digits[index]) {
-                const newDigits = [...digits];
-                newDigits[index] = '';
-                setDigits(newDigits);
-                setError(false);
-            } else if (index > 0) {
-                const newDigits = [...digits];
-                newDigits[index - 1] = '';
-                setDigits(newDigits);
-                setError(false);
-                inputRefs.current[index - 1].focus();
-            }
-        } else if (e.key === 'Enter') {
-            const pin = digits.join('');
-            if (pin.length === PIN_LENGTH) validatePin(pin);
-        } else if (e.key === 'ArrowLeft' && index > 0) {
-            inputRefs.current[index - 1].focus();
-        } else if (e.key === 'ArrowRight' && index < PIN_LENGTH - 1) {
-            inputRefs.current[index + 1].focus();
-        }
+            if (digits[index]) { const newDigits = [...digits]; newDigits[index] = ''; setDigits(newDigits); setError(false); }
+            else if (index > 0) { const newDigits = [...digits]; newDigits[index - 1] = ''; setDigits(newDigits); setError(false); inputRefs.current[index - 1].focus(); }
+        } else if (e.key === 'Enter') { const pin = digits.join(''); if (pin.length === PIN_LENGTH) validatePin(pin); }
+        else if (e.key === 'ArrowLeft' && index > 0) inputRefs.current[index - 1].focus();
+        else if (e.key === 'ArrowRight' && index < PIN_LENGTH - 1) inputRefs.current[index + 1].focus();
     };
 
     const handlePaste = (e) => {
@@ -839,81 +506,38 @@ const PinGateModal = ({ onSuccess, onClose }) => {
     };
 
     const validatePin = (pin) => {
-        if (pin === DEFAULT_PIN) {
-            onSuccess();
-        } else {
-            setError(true);
-            setShake(true);
-            setDigits(Array(PIN_LENGTH).fill(''));
-            setTimeout(() => {
-                setShake(false);
-                if (inputRefs.current[0]) inputRefs.current[0].focus();
-            }, 600);
+        if (pin === DEFAULT_PIN) { onSuccess(); }
+        else {
+            setError(true); setShake(true); setDigits(Array(PIN_LENGTH).fill(''));
+            setTimeout(() => { setShake(false); if (inputRefs.current[0]) inputRefs.current[0].focus(); }, 600);
         }
     };
 
-    const handleSubmit = () => {
-        const pin = digits.join('');
-        if (pin.length === PIN_LENGTH) validatePin(pin);
-    };
-
+    const handleSubmit = () => { const pin = digits.join(''); if (pin.length === PIN_LENGTH) validatePin(pin); };
     const filled = digits.filter(d => d !== '').length;
 
     return (
-        <div style={{
-            position: 'fixed', inset: 0,
-            background: 'rgba(6, 43, 20, 0.72)',
-            backdropFilter: 'blur(6px)',
-            zIndex: 1100,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
-        }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(6, 43, 20, 0.72)', backdropFilter: 'blur(6px)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
             <style>{`
-                @keyframes pinShake {
-                    0%,100% { transform: translateX(0); }
-                    15% { transform: translateX(-8px); }
-                    30% { transform: translateX(8px); }
-                    45% { transform: translateX(-6px); }
-                    60% { transform: translateX(6px); }
-                    75% { transform: translateX(-3px); }
-                    90% { transform: translateX(3px); }
-                }
-                @keyframes pinFadeIn {
-                    from { opacity: 0; transform: scale(0.92) translateY(12px); }
-                    to { opacity: 1; transform: scale(1) translateY(0); }
-                }
-                .pin-digit-input {
-                    width: 52px; height: 60px; text-align: center;
-                    font-size: 22px; font-weight: 700; border-radius: 12px;
-                    border: 2px solid #e2e8f0; background: #f8fafb; color: #062b14;
-                    outline: none; transition: border-color 0.18s, box-shadow 0.18s, background 0.18s;
-                    font-family: 'Courier New', monospace; caret-color: transparent;
-                }
-                .pin-digit-input:focus { border-color: #16a34a; background: #f0fdf4; box-shadow: 0 0 0 3px rgba(22,163,74,0.18); }
-                .pin-digit-input.pin-filled { border-color: #16a34a; background: #f0fdf4; color: #16a34a; }
-                .pin-digit-input.pin-error { border-color: #ef4444 !important; background: #fef2f2 !important; color: #ef4444 !important; box-shadow: 0 0 0 3px rgba(239,68,68,0.15) !important; }
+                @keyframes pinShake { 0%,100%{transform:translateX(0)}15%{transform:translateX(-8px)}30%{transform:translateX(8px)}45%{transform:translateX(-6px)}60%{transform:translateX(6px)}75%{transform:translateX(-3px)}90%{transform:translateX(3px)} }
+                @keyframes pinFadeIn { from{opacity:0;transform:scale(0.92) translateY(12px)}to{opacity:1;transform:scale(1) translateY(0)} }
+                .pin-digit-input{width:52px;height:60px;text-align:center;font-size:22px;font-weight:700;border-radius:12px;border:2px solid #e2e8f0;background:#f8fafb;color:#062b14;outline:none;transition:border-color 0.18s,box-shadow 0.18s,background 0.18s;font-family:'Courier New',monospace;caret-color:transparent;}
+                .pin-digit-input:focus{border-color:#16a34a;background:#f0fdf4;box-shadow:0 0 0 3px rgba(22,163,74,0.18);}
+                .pin-digit-input.pin-filled{border-color:#16a34a;background:#f0fdf4;color:#16a34a;}
+                .pin-digit-input.pin-error{border-color:#ef4444!important;background:#fef2f2!important;color:#ef4444!important;box-shadow:0 0 0 3px rgba(239,68,68,0.15)!important;}
             `}</style>
-            <div style={{
-                background: '#ffffff', borderRadius: '20px', width: '100%', maxWidth: '420px',
-                boxShadow: '0 32px 80px rgba(0,0,0,0.35)', overflow: 'hidden',
-                animation: 'pinFadeIn 0.28s cubic-bezier(0.34,1.56,0.64,1) both',
-            }}>
+            <div style={{ background: '#ffffff', borderRadius: '20px', width: '100%', maxWidth: '420px', boxShadow: '0 32px 80px rgba(0,0,0,0.35)', overflow: 'hidden', animation: 'pinFadeIn 0.28s cubic-bezier(0.34,1.56,0.64,1) both' }}>
                 <div style={{ background: W.bgHeader, padding: '24px 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Icon name="lock" />
-                        </div>
+                        <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="lock" /></div>
                         <div>
                             <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#ffffff' }}>Access Restricted</h2>
                             <p style={{ margin: 0, fontSize: '12px', color: 'rgba(255,255,255,0.55)' }}>Enter 6-digit PIN to continue</p>
                         </div>
                     </div>
-                    <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '8px', color: 'white', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>×</button>
                 </div>
-
                 <div style={{ padding: '36px 32px 32px' }}>
-                    <p style={{ textAlign: 'center', fontSize: '13px', color: W.textMuted, margin: '0 0 28px' }}>
-                        This feature requires authorization.<br />Please enter the admin PIN to proceed.
-                    </p>
+                    <p style={{ textAlign: 'center', fontSize: '13px', color: W.textMuted, margin: '0 0 28px' }}>This feature requires authorization.<br />Please enter the admin PIN to proceed.</p>
                     <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginBottom: '10px', animation: shake ? 'pinShake 0.55s ease' : 'none' }}>
                         {Array(PIN_LENGTH).fill(0).map((_, i) => (
                             <input key={i} ref={el => inputRefs.current[i] = el} type="password" inputMode="numeric" maxLength={1} value={digits[i]}
@@ -925,9 +549,7 @@ const PinGateModal = ({ onSuccess, onClose }) => {
                     <div style={{ height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '20px' }}>
                         {error && (
                             <p style={{ margin: 0, fontSize: '12px', color: W.danger, display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 600 }}>
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                    <circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="12" /><line x1="12" x2="12.01" y1="16" y2="16" />
-                                </svg>
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="12" /><line x1="12" x2="12.01" y1="16" y2="16" /></svg>
                                 Incorrect PIN. Please try again.
                             </p>
                         )}
@@ -947,12 +569,382 @@ const PinGateModal = ({ onSuccess, onClose }) => {
     );
 };
 
+const ProfileDropdown = ({ onClose, adminLabel, adminRole, isSuperAdmin, avatarLogo, onAbout, onLogout }) => {
+    const roleDisplay = isSuperAdmin ? 'JPCS President' : adminRole === 'avr' ? 'AVR Room Admin' : 'Computer Lab 2 Admin';
+    const roomTag = isSuperAdmin ? null : adminRole === 'avr' ? 'AVR' : 'Computer Lab 2';
+
+    const metaRows = [
+        { label: 'Role', value: roleDisplay },
+        { label: 'System', value: 'Entrance Exam Admin' },
+        { label: 'Institution', value: 'Kolehiyo Ng Subic' },
+        ...(roomTag ? [{ label: 'Room', value: roomTag }] : []),
+    ];
+
+    return (
+        <>
+            <style>{`
+                .no-animation { }
+                .pd-overlay {
+                    position: fixed;
+                    inset: 0;
+                    z-index: 1200;
+                    background: transparent;
+                }
+                .pd-card {
+                    position: fixed;
+                    top: 78px;
+                    right: 28px;
+                    width: 300px;
+                    background: #ffffff;
+                    border-radius: 16px;
+                    border: 1px solid #e8edf2;
+                    box-shadow: 0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06);
+                    overflow: hidden;
+                    z-index: 1201;
+                }
+                .pd-arrow {
+                    position: absolute;
+                    top: -7px;
+                    right: 36px;
+                    width: 14px;
+                    height: 14px;
+                    background: #ffffff;
+                    border-left: 1px solid #e8edf2;
+                    border-top: 1px solid #e8edf2;
+                    transform: rotate(45deg);
+                    border-radius: 2px 0 0 0;
+                }
+                .pd-header {
+                    padding: 18px 18px 16px;
+                    background: #f8fafb;
+                    border-bottom: 1px solid #edf2f7;
+                    display: flex;
+                    align-items: center;
+                    gap: 13px;
+                }
+                .pd-avatar {
+                    width: 46px;
+                    height: 46px;
+                    border-radius: 50%;
+                    overflow: hidden;
+                    border: 2px solid #e2e8f0;
+                    flex-shrink: 0;
+                }
+                .pd-avatar img {
+                    width: 100%;
+                    height: 100%;
+                    object-fit: cover;
+                    display: block;
+                }
+                .pd-name {
+                    margin: 0 0 4px;
+                    font-size: 14px;
+                    font-weight: 700;
+                    color: #0f172a;
+                    letter-spacing: -0.2px;
+                }
+                .pd-badge {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 4px;
+                    padding: 2px 8px;
+                    background: #f0fdf4;
+                    border: 1px solid #bbf7d0;
+                    border-radius: 99px;
+                    font-size: 10px;
+                    font-weight: 700;
+                    color: #16a34a;
+                    letter-spacing: 0.2px;
+                }
+                .pd-meta {
+                    padding: 4px 0;
+                    border-bottom: 1px solid #edf2f7;
+                }
+                .pd-meta-row {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    padding: 8px 18px;
+                    gap: 12px;
+                }
+                .pd-meta-row + .pd-meta-row {
+                    border-top: 1px solid #f1f5f9;
+                }
+                .pd-meta-label {
+                    font-size: 10px;
+                    font-weight: 600;
+                    color: #94a3b8;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                    flex-shrink: 0;
+                }
+                .pd-meta-value {
+                    font-size: 11.5px;
+                    font-weight: 600;
+                    color: #334155;
+                    text-align: right;
+                }
+                .pd-actions {
+                    padding: 6px 8px;
+                    border-bottom: 1px solid #edf2f7;
+                }
+                .pd-action-btn {
+                    width: 100%;
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    padding: 10px 12px;
+                    background: transparent;
+                    border: none;
+                    border-radius: 10px;
+                    cursor: pointer;
+                    font-family: inherit;
+                    transition: background 0.15s;
+                    text-align: left;
+                }
+                .pd-action-btn:hover {
+                    background: #f8fafb;
+                }
+                .pd-action-btn.danger:hover {
+                    background: #fef2f2;
+                }
+                .pd-action-icon {
+                    width: 30px;
+                    height: 30px;
+                    border-radius: 8px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    flex-shrink: 0;
+                }
+                .pd-action-icon.info-icon {
+                    background: #f0fdf4;
+                    color: #16a34a;
+                }
+                .pd-action-icon.danger-icon {
+                    background: #fef2f2;
+                    color: #ef4444;
+                }
+                .pd-action-text {
+                    flex: 1;
+                    font-size: 13px;
+                    font-weight: 600;
+                    color: #334155;
+                }
+                .pd-action-btn.danger .pd-action-text {
+                    color: #ef4444;
+                }
+                .pd-action-chevron {
+                    color: #cbd5e1;
+                    display: flex;
+                    align-items: center;
+                }
+                .pd-action-btn.danger .pd-action-chevron {
+                    color: #fca5a5;
+                }
+                .pd-footer {
+                    padding: 10px 8px 10px;
+                }
+                .pd-close-btn {
+                    width: 100%;
+                    padding: 9px;
+                    background: #f8fafb;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 10px;
+                    color: #64748b;
+                    font-size: 12px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    font-family: inherit;
+                    transition: all 0.15s;
+                }
+                .pd-close-btn:hover {
+                    background: #f1f5f9;
+                    color: #334155;
+                }
+            `}</style>
+            <div className="pd-overlay" onClick={onClose} />
+            <div className="pd-card">
+                <div className="pd-arrow" />
+                <div className="pd-header">
+                    <div className="pd-avatar">
+                        <img src={avatarLogo} alt="Admin" />
+                    </div>
+                    <div>
+                        <p className="pd-name">{adminLabel}</p>
+                        <span className="pd-badge">
+                            <Icon name="shield" />
+                            {roleDisplay}
+                        </span>
+                    </div>
+                </div>
+                <div className="pd-meta">
+                    {metaRows.map(row => (
+                        <div key={row.label} className="pd-meta-row">
+                            <span className="pd-meta-label">{row.label}</span>
+                            <span className="pd-meta-value">{row.value}</span>
+                        </div>
+                    ))}
+                </div>
+                <div className="pd-actions">
+                    <button className="pd-action-btn" onClick={() => { onClose(); onAbout(); }}>
+                        <span className="pd-action-icon info-icon"><Icon name="info" /></span>
+                        <span className="pd-action-text">About This App</span>
+                        <span className="pd-action-chevron"><Icon name="chevronRight" /></span>
+                    </button>
+                    <button className="pd-action-btn danger" onClick={() => { onClose(); onLogout(); }}>
+                        <span className="pd-action-icon danger-icon"><Icon name="logout" /></span>
+                        <span className="pd-action-text">Sign Out</span>
+                        <span className="pd-action-chevron"><Icon name="chevronRight" /></span>
+                    </button>
+                </div>
+                <div className="pd-footer">
+                    <button className="pd-close-btn" onClick={onClose}>Dismiss</button>
+                </div>
+            </div>
+        </>
+    );
+};
+
+const AboutModal = ({ onClose }) => {
+    const aboutRows = [
+        { label: 'Created by', value: 'Jayvee Madriaga Nacino', accent: true },
+        { label: 'Title', value: 'JPCS President' },
+        { label: 'Organization', value: 'Junior Philippine Computer Society (JPCS)' },
+        { label: 'Institution', value: 'Kolehiyo Ng Subic' },
+    ];
+
+    return (
+        <>
+            <style>{`
+                .about-side-card {
+                    position: fixed;
+                    top: 78px;
+                    right: 340px;
+                    width: 320px;
+                    background: #ffffff;
+                    border-radius: 16px;
+                    border: 1px solid #e8edf2;
+                    box-shadow: 0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06);
+                    overflow: hidden;
+                    z-index: 1202;
+                }
+                .about-card-header {
+                    padding: 22px 20px 18px;
+                    background: #f8fafb;
+                    border-bottom: 1px solid #edf2f7;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    text-align: center;
+                }
+                .about-icon-wrap {
+                    width: 50px;
+                    height: 50px;
+                    border-radius: 14px;
+                    background: #f0fdf4;
+                    border: 1.5px solid #bbf7d0;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    margin-bottom: 12px;
+                }
+                .about-title {
+                    margin: 0 0 3px;
+                    font-size: 15px;
+                    font-weight: 800;
+                    color: #0f172a;
+                    letter-spacing: -0.2px;
+                }
+                .about-subtitle {
+                    margin: 0;
+                    font-size: 11px;
+                    color: #94a3b8;
+                    font-weight: 500;
+                }
+                .about-meta {
+                    padding: 4px 0;
+                    border-bottom: 1px solid #edf2f7;
+                }
+                .about-meta-row {
+                    display: flex;
+                    align-items: flex-start;
+                    justify-content: space-between;
+                    padding: 10px 20px;
+                    gap: 14px;
+                }
+                .about-meta-row + .about-meta-row {
+                    border-top: 1px solid #f1f5f9;
+                }
+                .about-meta-label {
+                    font-size: 10px;
+                    font-weight: 600;
+                    color: #94a3b8;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                    flex-shrink: 0;
+                    padding-top: 1px;
+                }
+                .about-meta-value {
+                    font-size: 12px;
+                    font-weight: 600;
+                    color: #334155;
+                    text-align: right;
+                }
+                .about-meta-value.accent {
+                    color: #16a34a;
+                    font-weight: 700;
+                }
+                .about-footer {
+                    padding: 12px 14px;
+                }
+                .about-close-btn {
+                    width: 100%;
+                    padding: 10px;
+                    background: #062b14;
+                    border: none;
+                    border-radius: 10px;
+                    color: #ffffff;
+                    font-size: 13px;
+                    font-weight: 700;
+                    cursor: pointer;
+                    font-family: inherit;
+                    letter-spacing: 0.3px;
+                    transition: background 0.15s;
+                }
+                .about-close-btn:hover {
+                    background: #0c4222;
+                }
+            `}</style>
+            <div className="about-side-card">
+                <div className="about-card-header">
+                    <div className="about-icon-wrap">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
+                            <path d="M6 12v5c3 3 9 3 12 0v-5" />
+                        </svg>
+                    </div>
+                    <p className="about-title">KNS Entrance Exam System</p>
+                    <p className="about-subtitle">Kolehiyo Ng Subic — Admissions Platform</p>
+                </div>
+                <div className="about-meta">
+                    {aboutRows.map(row => (
+                        <div key={row.label} className="about-meta-row">
+                            <span className="about-meta-label">{row.label}</span>
+                            <span className={`about-meta-value${row.accent ? ' accent' : ''}`}>{row.value}</span>
+                        </div>
+                    ))}
+                </div>
+                <div className="about-footer">
+                    <button className="about-close-btn" onClick={onClose}>Close</button>
+                </div>
+            </div>
+        </>
+    );
+};
+
 const StudentCodeModal = ({ onClose }) => {
-    const [form, setForm] = useState({
-        name: '', dob: '', sex: '', contact: '', pob: '', address: '',
-        firstCourse: '', secondCourse: '', lastSchool: '', lastSchoolAddress: '',
-        transferee: false, transfereeCourse: '', guardian: '',
-    });
+    const [form, setForm] = useState({ name: '', dob: '', sex: '', contact: '', pob: '', address: '', firstCourse: '', secondCourse: '', lastSchool: '', lastSchoolAddress: '', transferee: false, transfereeCourse: '', guardian: '' });
     const [scores, setScores] = useState([]);
     const [subjectsLoading, setSubjectsLoading] = useState(true);
     const [subjectsError, setSubjectsError] = useState(null);
@@ -961,93 +953,58 @@ const StudentCodeModal = ({ onClose }) => {
     const [saveSuccess, setSaveSuccess] = useState(false);
     const adminRole = localStorage.getItem("admin_role");
 
-    React.useEffect(() => {
+    useEffect(() => {
         const fetchSubjects = async () => {
             try {
-                setSubjectsLoading(true);
-                setSubjectsError(null);
+                setSubjectsLoading(true); setSubjectsError(null);
                 const res = await fetch(`${import.meta.env.VITE_API_URL}/api/subjects`);
                 if (!res.ok) throw new Error('Failed to fetch subjects');
                 const data = await res.json();
                 setScores(data.map(s => ({ subjectId: s._id, subject: s.name, score: 0, total: 20 })));
-            } catch (err) {
-                setSubjectsError(err.message);
-            } finally {
-                setSubjectsLoading(false);
-            }
+            } catch (err) { setSubjectsError(err.message); }
+            finally { setSubjectsLoading(false); }
         };
         fetchSubjects();
     }, []);
 
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
-        if (name === 'secondCourse' && value !== '' && value === form.firstCourse) {
-            Swal.fire({ icon: 'warning', title: 'Duplicate Course Selection', text: 'Your 2nd course choice must be different from your 1st course choice.', confirmButtonText: 'OK', confirmButtonColor: '#16a34a' });
-            return;
-        }
-        if (name === 'firstCourse' && value !== '' && value === form.secondCourse) {
-            Swal.fire({ icon: 'warning', title: 'Duplicate Course Selection', text: 'Your 1st course choice must be different from your 2nd course choice.', confirmButtonText: 'OK', confirmButtonColor: '#16a34a' });
-            return;
-        }
+        if (name === 'secondCourse' && value !== '' && value === form.firstCourse) { Swal.fire({ icon: 'warning', title: 'Duplicate Course Selection', text: 'Your 2nd course choice must be different from your 1st course choice.', confirmButtonText: 'OK', confirmButtonColor: '#16a34a' }); return; }
+        if (name === 'firstCourse' && value !== '' && value === form.secondCourse) { Swal.fire({ icon: 'warning', title: 'Duplicate Course Selection', text: 'Your 1st course choice must be different from your 2nd course choice.', confirmButtonText: 'OK', confirmButtonColor: '#16a34a' }); return; }
         setForm(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
     };
 
-    const handleScoreChange = (i, val) => {
-        setScores(prev => prev.map((s, idx) => idx === i ? { ...s, score: Math.min(s.total, Math.max(0, Number(val))) } : s));
-    };
+    const handleScoreChange = (i, val) => { setScores(prev => prev.map((s, idx) => idx === i ? { ...s, score: Math.min(s.total, Math.max(0, Number(val))) } : s)); };
 
     const handleSubmit = async () => {
-        setSaving(true);
-        setSaveError(null);
+        setSaving(true); setSaveError(null);
         try {
-            const userRes = await fetch(`${import.meta.env.VITE_API_URL}/api/users/register`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name: form.name, dob: form.dob, sex: form.sex, contact: form.contact,
-                    pob: form.pob, address: form.address, firstCourse: form.firstCourse,
-                    secondCourse: form.secondCourse, lastSchool: form.lastSchool,
-                    lastSchoolAddress: form.lastSchoolAddress, transferee: form.transferee,
-                    transfereeCourse: form.transfereeCourse, guardian: form.guardian,
-                    room: adminRole === 'superadmin' ? 'avr' : adminRole,
-                }),
-            });
+            const userRes = await fetch(`${import.meta.env.VITE_API_URL}/api/users/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.name, dob: form.dob, sex: form.sex, contact: form.contact, pob: form.pob, address: form.address, firstCourse: form.firstCourse, secondCourse: form.secondCourse, lastSchool: form.lastSchool, lastSchoolAddress: form.lastSchoolAddress, transferee: form.transferee, transfereeCourse: form.transfereeCourse, guardian: form.guardian, room: adminRole === 'superadmin' ? 'avr' : adminRole }) });
             if (!userRes.ok) { const errData = await userRes.json(); throw new Error(errData.error || 'Failed to register student'); }
             const userData = await userRes.json();
             const userId = userData.user._id;
             const totalScore = scores.reduce((a, s) => a + s.score, 0);
             const totalQuestions = scores.reduce((a, s) => a + s.total, 0);
-            const resultRes = await fetch(`${import.meta.env.VITE_API_URL}/api/results/create`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId, answers: [], score: totalScore, totalQuestions, subjectScores: scores.map(s => ({ subject: s.subject, score: s.score, total: s.total })) }),
-            });
+            const resultRes = await fetch(`${import.meta.env.VITE_API_URL}/api/results/create`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId, answers: [], score: totalScore, totalQuestions, subjectScores: scores.map(s => ({ subject: s.subject, score: s.score, total: s.total })) }) });
             if (!resultRes.ok) { const errData = await resultRes.json(); throw new Error(errData.error || 'Failed to save result'); }
             setSaveSuccess(true);
             setTimeout(() => onClose(), 1500);
-        } catch (err) {
-            setSaveError(err.message);
-        } finally {
-            setSaving(false);
-        }
+        } catch (err) { setSaveError(err.message); }
+        finally { setSaving(false); }
     };
 
     const totalScore = scores.reduce((a, s) => a + s.score, 0);
     const totalMax = scores.reduce((a, s) => a + s.total, 0);
-    const canSubmit = !subjectsLoading && !subjectsError && !saving && !saveSuccess &&
-        form.name && form.dob && form.sex && form.contact && form.address && form.firstCourse && form.lastSchool && form.guardian;
+    const canSubmit = !subjectsLoading && !subjectsError && !saving && !saveSuccess && form.name && form.dob && form.sex && form.contact && form.address && form.firstCourse && form.lastSchool && form.guardian;
 
     return (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-            <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+            <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
             <div style={{ background: W.bg, borderRadius: '16px', width: '100%', maxWidth: '1100px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.25)', overflow: 'hidden' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 28px', background: W.bgHeader, flexShrink: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.2)' }}>
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
-                                <path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                            </svg>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
                         </div>
                         <div>
                             <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#ffffff' }}>Student Registration & Score Entry</h2>
@@ -1056,7 +1013,6 @@ const StudentCodeModal = ({ onClose }) => {
                     </div>
                     <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '8px', color: 'white', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>×</button>
                 </div>
-
                 <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
                     <div style={{ flex: 1.3, overflowY: 'auto', padding: '24px 28px', borderRight: `1px solid ${W.border}`, background: W.bg }}>
                         <SCSection title="Personal Information">
@@ -1077,7 +1033,6 @@ const StudentCodeModal = ({ onClose }) => {
                                 <SCField label="Home Address *"><SCInput name="address" placeholder="Street, Barangay, City" value={form.address} onChange={handleChange} required /></SCField>
                             </div>
                         </SCSection>
-
                         <SCSection title="Course Preference">
                             <SCField label="1st Course Choice *">
                                 <SCSelect name="firstCourse" value={form.firstCourse} onChange={handleChange} required>
@@ -1092,33 +1047,26 @@ const StudentCodeModal = ({ onClose }) => {
                                 </SCSelect>
                             </SCField>
                         </SCSection>
-
                         <SCSection title="Educational Background">
                             <SCField label="Last School Attended *"><SCInput name="lastSchool" placeholder="School Name" value={form.lastSchool} onChange={handleChange} required /></SCField>
                             <SCField label="Address of Last School"><SCInput name="lastSchoolAddress" placeholder="Street, Barangay, City" value={form.lastSchoolAddress} onChange={handleChange} /></SCField>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', background: W.bgSection, borderRadius: '8px', border: `1px solid ${W.border}`, cursor: 'pointer', marginTop: '4px' }}
-                                onClick={() => setForm(p => ({ ...p, transferee: !p.transferee }))}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', background: W.bgSection, borderRadius: '8px', border: `1px solid ${W.border}`, cursor: 'pointer', marginTop: '4px' }} onClick={() => setForm(p => ({ ...p, transferee: !p.transferee }))}>
                                 <div style={{ width: '16px', height: '16px', borderRadius: '4px', border: `2px solid ${form.transferee ? W.accent : W.borderInput}`, background: form.transferee ? W.accent : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.2s' }}>
                                     {form.transferee && <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg>}
                                 </div>
                                 <label style={{ fontSize: '13px', color: W.textMuted, cursor: 'pointer', userSelect: 'none' }}>I am a Transferee</label>
                             </div>
-                            {form.transferee && (
-                                <SCField label="Previous Course Taken *"><SCInput name="transfereeCourse" placeholder="Course Name" value={form.transfereeCourse} onChange={handleChange} required /></SCField>
-                            )}
+                            {form.transferee && (<SCField label="Previous Course Taken *"><SCInput name="transfereeCourse" placeholder="Course Name" value={form.transfereeCourse} onChange={handleChange} required /></SCField>)}
                         </SCSection>
-
                         <SCSection title="Guardian / Parent Information">
                             <SCField label="Guardian / Parent Full Name *"><SCInput name="guardian" placeholder="Lastname, Firstname" value={form.guardian} onChange={handleChange} required /></SCField>
                         </SCSection>
                     </div>
-
                     <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px', display: 'flex', flexDirection: 'column', background: W.bg }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '18px' }}>
                             <div style={{ width: '3px', height: '14px', background: W.accent, borderRadius: '2px' }} />
                             <p style={{ margin: 0, fontSize: '12px', fontWeight: 700, color: W.textPrimary, letterSpacing: '0.4px', textTransform: 'uppercase' }}>Score Entry</p>
                         </div>
-
                         <div style={{ background: W.bg, border: `1px solid ${W.border}`, borderRadius: '12px', overflow: 'hidden', marginBottom: '20px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
                             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                 <thead>
@@ -1148,8 +1096,7 @@ const StudentCodeModal = ({ onClose }) => {
                                             <tr key={s.subjectId} style={{ borderBottom: `1px solid ${W.border}` }}>
                                                 <td style={{ padding: '12px 16px', fontSize: '13px', color: W.textPrimary, fontWeight: 500 }}>{s.subject}</td>
                                                 <td style={{ padding: '10px 16px', textAlign: 'center' }}>
-                                                    <input type="number" value={s.score} min={0} max={s.total} onChange={e => handleScoreChange(i, e.target.value)}
-                                                        style={{ width: '64px', padding: '6px 10px', textAlign: 'center', background: W.accentBg, border: `1px solid ${W.accent}`, borderRadius: '8px', color: W.accent, fontSize: '14px', fontWeight: 700, outline: 'none', fontFamily: 'inherit' }} />
+                                                    <input type="number" value={s.score} min={0} max={s.total} onChange={e => handleScoreChange(i, e.target.value)} style={{ width: '64px', padding: '6px 10px', textAlign: 'center', background: W.accentBg, border: `1px solid ${W.accent}`, borderRadius: '8px', color: W.accent, fontSize: '14px', fontWeight: 700, outline: 'none', fontFamily: 'inherit' }} />
                                                 </td>
                                                 <td style={{ padding: '12px 16px', textAlign: 'center', fontSize: '13px', color: W.textMuted }}>{s.total}</td>
                                             </tr>
@@ -1167,7 +1114,6 @@ const StudentCodeModal = ({ onClose }) => {
                                 )}
                             </table>
                         </div>
-
                         {saveError && (
                             <div style={{ marginBottom: '14px', padding: '12px 16px', background: W.dangerBg, border: `1px solid ${W.dangerBorder}`, borderRadius: '8px', color: W.danger, fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="12" /><line x1="12" x2="12.01" y1="16" y2="16" /></svg>
@@ -1180,7 +1126,6 @@ const StudentCodeModal = ({ onClose }) => {
                                 Student registered and scores saved successfully!
                             </div>
                         )}
-
                         <div style={{ marginTop: 'auto', display: 'flex', gap: '10px', justifyContent: 'flex-end', paddingTop: '16px', borderTop: `1px solid ${W.border}` }}>
                             <button onClick={onClose} style={{ padding: '10px 20px', background: W.bg, border: `1px solid ${W.border}`, borderRadius: '8px', color: W.textMuted, fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
                             <button onClick={handleSubmit} disabled={!canSubmit} style={{ padding: '10px 24px', background: canSubmit ? W.accent : W.bgSection, border: `1px solid ${canSubmit ? W.accent : W.border}`, borderRadius: '8px', color: canSubmit ? '#ffffff' : W.textDim, fontSize: '13px', fontWeight: 700, cursor: canSubmit ? 'pointer' : 'not-allowed', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: '8px', transition: 'all 0.2s' }}>
@@ -1265,25 +1210,17 @@ export default function AdminDashboardPage() {
                             <div className="kns-banner-left">
                                 <h1>Entrance Exam Management</h1>
                                 <p>
-                                    {adminRole === 'avr'
-                                        ? 'Welcome, AVR Admin!'
-                                        : adminRole === 'comlab-2'
-                                            ? 'Welcome, Comlab Admin!'
-                                            : 'Welcome, JPCS Admin!'}
+                                    {adminRole === 'avr' ? 'Welcome, AVR Admin!' : adminRole === 'comlab-2' ? 'Welcome, Comlab Admin!' : 'Welcome, JPCS Admin!'}
                                 </p>
                             </div>
                         </div>
                         <div className="kns-dashboard-grid">
                             <div className="kns-activity-panel">
-                                <div className="kns-panel-header">
-                                    <h3>Operational Overview</h3>
-                                </div>
+                                <div className="kns-panel-header"><h3>Operational Overview</h3></div>
                                 <OperationalOverview />
                             </div>
                             <div className="kns-actions-panel">
-                                <div className="kns-panel-header">
-                                    <h3>Quick Actions</h3>
-                                </div>
+                                <div className="kns-panel-header"><h3>Quick Actions</h3></div>
                                 <div className="kns-actions-grid">
                                     <button className="kns-action-btn" onClick={handleStudentCodeClick}>Student Code</button>
                                     <button className="kns-action-btn" onClick={() => setActiveTab('STUDENT LIST')}>View Student List</button>
@@ -1325,25 +1262,30 @@ export default function AdminDashboardPage() {
                         </button>
                     ))}
                 </nav>
-                <button className="kns-logout-trigger" onClick={handleLogout}>
-                    <Icon name="logout" /> <span>Logout</span>
-                </button>
             </aside>
 
             <main className="kns-main-viewport">
                 <header className="kns-topbar">
-                    <div className="kns-search-wrapper">
-                    </div>
+                    <div className="kns-search-wrapper" />
                     <div className="kns-admin-profile">
-                        <div className="kns-profile-data">
-                            <div className="kns-avatar" style={{ width: '36px', height: '36px', borderRadius: '50%', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #16a34a', flexShrink: 0 }}>
-                                <img src={avatarLogo} alt="Admin Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <button
+                            className="kns-profile-pill-btn"
+                            onClick={() => setModalState(modalState === 'profile' ? null : 'profile')}
+                            title="View Profile"
+                        >
+                            <div className="kns-profile-pill-avatar">
+                                <img src={avatarLogo} alt="Admin Avatar" />
                             </div>
-                            <div className="kns-admin-text">
-                                <p className="kns-user-name">{adminLabel}</p>
-                                <p className="kns-user-role">{isSuperAdmin ? 'JPCS President' : 'Room Admin'}</p>
+                            <div className="kns-profile-pill-text">
+                                <span className="kns-profile-pill-name">{adminLabel}</span>
+                                <span className="kns-profile-pill-role">{isSuperAdmin ? 'JPCS President' : 'Room Admin'}</span>
                             </div>
-                        </div>
+                            <div className="kns-profile-pill-chevron">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: modalState === 'profile' ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease', color: '#94a3b8' }}>
+                                    <polyline points="6 9 12 15 18 9" />
+                                </svg>
+                            </div>
+                        </button>
                     </div>
                 </header>
                 <section className="kns-dynamic-content">
@@ -1353,6 +1295,31 @@ export default function AdminDashboardPage() {
 
             {modalState === 'pin' && <PinGateModal onSuccess={handlePinSuccess} onClose={handleCloseAll} />}
             {modalState === 'studentCode' && <StudentCodeModal onClose={handleCloseAll} />}
+            {modalState === 'profile' && (
+                <ProfileDropdown
+                    onClose={handleCloseAll}
+                    adminLabel={adminLabel}
+                    adminRole={adminRole}
+                    isSuperAdmin={isSuperAdmin}
+                    avatarLogo={avatarLogo}
+                    onAbout={() => setModalState('about')}
+                    onLogout={handleLogout}
+                />
+            )}
+            {modalState === 'about' && (
+                <>
+                    <ProfileDropdown
+                        onClose={handleCloseAll}
+                        adminLabel={adminLabel}
+                        adminRole={adminRole}
+                        isSuperAdmin={isSuperAdmin}
+                        avatarLogo={avatarLogo}
+                        onAbout={() => setModalState('about')}
+                        onLogout={handleLogout}
+                    />
+                    <AboutModal onClose={() => setModalState('profile')} />
+                </>
+            )}
         </div>
     );
 }

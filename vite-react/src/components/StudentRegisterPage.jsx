@@ -9,21 +9,21 @@ import "../css/student_css/studentRegisterPage.css";
 
 export default function StudentRegisterPage({ room }) {
     const [form, setForm] = useState({
-    name: "",
-    registerNumber: "",
-    firstCourse: "",
-    secondCourse: "",
-    sex: "",
-    address: "",
-    dob: "",
-    pob: "",
-    contact: "",
-    guardian: "",
-    lastSchool: "",
-    lastSchoolAddress: "",
-    transferee: false,
-    transfereeCourse: ""
-});
+        name: "",
+        registerNumber: "",
+        firstCourse: "",
+        secondCourse: "",
+        sex: "",
+        address: "",
+        dob: "",
+        pob: "",
+        contact: "",
+        guardian: "",
+        lastSchool: "",
+        lastSchoolAddress: "",
+        transferee: false,
+        transfereeCourse: ""
+    });
 
     const [showText, setShowText] = useState(true);
     const [isAllowed, setIsAllowed] = useState(true);
@@ -102,10 +102,11 @@ export default function StudentRegisterPage({ room }) {
 
         try {
             const API_URL = import.meta.env.VITE_API_URL;
+            const payload = { ...form, room };
             const res = await fetch(`${API_URL}/api/users/register`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ...form, room })
+                body: JSON.stringify(payload)
             });
 
             const text = await res.text();
@@ -224,32 +225,32 @@ export default function StudentRegisterPage({ room }) {
                 <form className="srp-form" onSubmit={handleSubmit}>
                     <div className="srp-section">
                         <h2 className="srp-section-title">Personal Information</h2>
-                                                    <div className="srp-grid srp-grid-2">
-                                <div className="srp-field">
-                                    <label className="srp-label">Full Name *</label>
-                                    <input
-                                        type="text"
-                                        name="name"
-                                        className="srp-input"
-                                        placeholder="Lastname, Firstname Middlename"
-                                        value={form.name}
-                                        onChange={handleChange}
-                                        required
-                                    />
-                                </div>
-                                <div className="srp-field">
-                                    <label className="srp-label">Register Number*</label>
-                                    <input
-                                        type="number"
-                                        name="registerNumber"
-                                        className="srp-input"
-                                        placeholder="Enter Register Number"
-                                        value={form.registerNumber}
-                                        onChange={handleChange}
-                                        required
-                                    />
-                                </div>
+                        <div className="srp-grid srp-grid-2">
+                            <div className="srp-field">
+                                <label className="srp-label">Full Name *</label>
+                                <input
+                                    type="text"
+                                    name="name"
+                                    className="srp-input"
+                                    placeholder="Lastname, Firstname Middlename"
+                                    value={form.name}
+                                    onChange={handleChange}
+                                    required
+                                />
                             </div>
+                            <div className="srp-field">
+                                <label className="srp-label">Register Number*</label>
+                                <input
+                                    type="number"
+                                    name="registerNumber"
+                                    className="srp-input"
+                                    placeholder="Enter Register Number"
+                                    value={form.registerNumber}
+                                    onChange={handleChange}
+                                    required
+                                />
+                            </div>
+                        </div>
                         <div className="srp-grid srp-grid-3">
                             <div className="srp-field">
                                 <label className="srp-label">Date of Birth *</label>

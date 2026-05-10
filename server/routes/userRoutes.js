@@ -24,6 +24,7 @@ router.post("/register", async (req, res) => {
             transferee: req.body.transferee,
             transfereeCourse: req.body.transfereeCourse,
             registerNumber: req.body.registerNumber,
+            room: req.body.room,
         });
 
         await newUser.save();
