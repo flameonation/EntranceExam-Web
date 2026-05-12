@@ -32,10 +32,259 @@ function SkeletonBlock({ width = '100%', height = '16px', radius = '6px', style 
     );
 }
 
+const DEPT_CS = ['Bachelor of Science in Computer Science'];
+const DEPT_BUS = [
+    'Bachelor of Science in Accountancy',
+    'Bachelor of Science in Business Administration (Financial Management)',
+    'Bachelor of Science in Business Administration (Human Resource Management)',
+    'Bachelor of Science in Business Administration (Operations Management)',
+];
+const DEPT_HM = ['Bachelor of Science in Hospitality Management'];
+const DEPT_ED = [
+    'Bachelor of Secondary Education major in Filipino (BSED \u2013 Filipino)',
+    'Bachelor of Secondary Education major in English (BSED \u2013 English)',
+    'Bachelor of Secondary Education major in Mathematics (BSED \u2013 Math)',
+    'Bachelor of Secondary Education major in Social Studies (BSED \u2013 Social Studies)',
+    'Bachelor of Elementary Education (BEEd)',
+];
+
+function getDept(course) {
+    if (!course) return null;
+    if (DEPT_CS.includes(course)) return 'cs';
+    if (DEPT_BUS.includes(course)) return 'bus';
+    if (DEPT_HM.includes(course)) return 'hm';
+    if (DEPT_ED.includes(course)) return 'ed';
+    return null;
+}
+
+const DEPT_META = {
+    cs:  { label: 'Computer Science', color: '#8b5cf6', bg: '#faf5ff', border: '#ddd6fe' },
+    bus: { label: 'Business / Accountancy', color: '#eab308', bg: '#fefce8', border: '#fde68a' },
+    hm:  { label: 'Hospitality Management', color: '#ef4444', bg: '#fef2f2', border: '#fecaca' },
+    ed:  { label: 'Education', color: '#3b82f6', bg: '#eff6ff', border: '#bfdbfe' },
+};
+
+function DeptBarGraph({ results }) {
+    const total = results.length;
+    const counts = { cs: 0, bus: 0, hm: 0, ed: 0 };
+    results.forEach(r => {
+        const d = getDept(r.firstCourse);
+        if (d) counts[d]++;
+    });
+    const maxCount = Math.max(...Object.values(counts), 1);
+
+    return (
+        <div style={{ padding: '4px 0' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+                <div style={{ width: '3px', height: '14px', background: '#16a34a', borderRadius: '2px' }} />
+                <p style={{ margin: 0, fontSize: '12px', fontWeight: 700, color: '#0f172a', letterSpacing: '0.4px', textTransform: 'uppercase' }}>Course Department Breakdown</p>
+                <span style={{ marginLeft: 'auto', fontSize: '11px', color: '#94a3b8' }}>{total} total</span>
+            </div>
+            <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                {Object.entries(DEPT_META).map(([key, meta]) => {
+                    const count = counts[key];
+                    const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+                    const barPct = maxCount > 0 ? (count / maxCount) * 100 : 0;
+                    return (
+                        <div key={key}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: meta.color, flexShrink: 0 }} />
+                                    <span style={{ fontSize: '12px', fontWeight: 600, color: '#0f172a' }}>{meta.label}</span>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span style={{ fontSize: '13px', fontWeight: 800, color: meta.color }}>{count}</span>
+                                    <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 500 }}>({pct}%)</span>
+                                </div>
+                            </div>
+                            <div style={{ height: '10px', background: '#f1f5f9', borderRadius: '99px', overflow: 'hidden' }}>
+                                <div style={{
+                                    height: '100%',
+                                    width: `${barPct}%`,
+                                    background: meta.color,
+                                    borderRadius: '99px',
+                                    transition: 'width 0.7s cubic-bezier(0.4,0,0.2,1)',
+                                }} />
+                            </div>
+                        </div>
+                    );
+                })}
+                {total === 0 && (
+                    <p style={{ fontSize: '12px', color: '#94a3b8', margin: 0, textAlign: 'center' }}>No data available.</p>
+                )}
+            </div>
+        </div>
+    );
+}
+
+function generateTodayToken() {
+    const now = new Date();
+    // Start of current day (midnight) in local time
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    // End of day (midnight of next day)
+    const endOfDay = startOfDay + 24 * 60 * 60 * 1000;
+    return btoa(JSON.stringify({ ts: startOfDay, exp: endOfDay }));
+}
+
+function getTodayResultsUrl() {
+    const token = generateTodayToken();
+    const base = window.location.origin;
+    return `${base}/daily-results?token=${token}`;
+}
+
+function QRCodeSVG({ value, size = 200 }) {
+    const [qrDataUrl, setQrDataUrl] = useState(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        async function loadQR() {
+            try {
+                const QRCode = (await import('qrcode')).default;
+                const url = await QRCode.toDataURL(value, { width: size, margin: 2, color: { dark: '#062b14', light: '#ffffff' } });
+                if (!cancelled) setQrDataUrl(url);
+            } catch {
+                if (!cancelled) setQrDataUrl('error');
+            }
+        }
+        loadQR();
+        return () => { cancelled = true; };
+    }, [value, size]);
+
+    if (qrDataUrl === 'error') {
+        return (
+            <div style={{ width: size, height: size, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafb', border: '1px solid #e2e8f0', borderRadius: '12px', color: '#94a3b8', fontSize: '12px', textAlign: 'center', padding: '16px' }}>
+                QR unavailable.<br />Copy the URL below.
+            </div>
+        );
+    }
+
+    if (!qrDataUrl) {
+        return (
+            <div style={{ width: size, height: size, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px' }}>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'spin 1s linear infinite' }}><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
+            </div>
+        );
+    }
+
+    return <img src={qrDataUrl} alt="QR Code" style={{ width: size, height: size, borderRadius: '12px', display: 'block' }} />;
+}
+
+function QRLinkModal({ onClose }) {
+    const [url] = useState(() => getTodayResultsUrl());
+    const [copied, setCopied] = useState(false);
+    const [timeLeft, setTimeLeft] = useState('');
+
+    useEffect(() => {
+        function calcTime() {
+            try {
+                const token = new URL(url).searchParams.get('token');
+                const { exp } = JSON.parse(atob(token));
+                const diff = exp - Date.now();
+                if (diff <= 0) { setTimeLeft('Expired'); return; }
+                const h = Math.floor(diff / 3600000);
+                const m = Math.floor((diff % 3600000) / 60000);
+                const s = Math.floor((diff % 60000) / 1000);
+                setTimeLeft(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`);
+            } catch { setTimeLeft('—'); }
+        }
+        calcTime();
+        const id = setInterval(calcTime, 1000);
+        return () => clearInterval(id);
+    }, [url]);
+
+    const handleCopy = () => {
+        navigator.clipboard.writeText(url).then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        });
+    };
+
+    const isExpired = timeLeft === 'Expired';
+
+    return (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(6,43,20,0.72)', backdropFilter: 'blur(6px)', zIndex: 1300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+            <style>{`
+                @keyframes qrModalIn { from{opacity:0;transform:scale(0.92) translateY(14px)}to{opacity:1;transform:scale(1) translateY(0)} }
+                @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+            `}</style>
+            <div style={{ background: '#ffffff', borderRadius: '20px', width: '100%', maxWidth: '400px', boxShadow: '0 32px 80px rgba(0,0,0,0.35)', overflow: 'hidden', animation: 'qrModalIn 0.28s cubic-bezier(0.34,1.56,0.64,1) both' }}>
+                <div style={{ background: '#062b14', padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>
+                                <rect x="14" y="14" width="3" height="3" rx="0.5"/><rect x="18" y="14" width="3" height="3" rx="0.5"/><rect x="14" y="18" width="3" height="3" rx="0.5"/><rect x="18" y="18" width="3" height="3" rx="0.5"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <h2 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#ffffff' }}>Daily Results QR</h2>
+                            <p style={{ margin: 0, fontSize: '11px', color: 'rgba(255,255,255,0.55)' }}>Valid for 24 hours from generation</p>
+                        </div>
+                    </div>
+                    <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '8px', color: 'white', width: '30px', height: '30px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', lineHeight: 1 }}>×</button>
+                </div>
+
+                <div style={{ padding: '28px 28px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
+                    <div style={{ padding: '12px', background: '#f0fdf4', border: '2px solid #bbf7d0', borderRadius: '16px' }}>
+                        <QRCodeSVG value={url} size={180} />
+                    </div>
+
+                    <div style={{ width: '100%', background: isExpired ? '#fef2f2' : '#f0fdf4', border: `1px solid ${isExpired ? '#fecaca' : '#bbf7d0'}`, borderRadius: '10px', padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={isExpired ? '#ef4444' : '#16a34a'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                            </svg>
+                            <span style={{ fontSize: '11px', fontWeight: 600, color: isExpired ? '#ef4444' : '#16a34a', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                {isExpired ? 'Link Expired' : 'Expires in'}
+                            </span>
+                        </div>
+                        <span style={{ fontSize: '16px', fontWeight: 800, color: isExpired ? '#ef4444' : '#062b14', fontFamily: "'Courier New', monospace", letterSpacing: '2px' }}>
+                            {timeLeft}
+                        </span>
+                    </div>
+
+                    <div style={{ width: '100%' }}>
+                        <p style={{ margin: '0 0 8px', fontSize: '10px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Share URL</p>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'stretch' }}>
+                            <div style={{ flex: 1, padding: '10px 12px', background: '#f8fafb', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '11px', color: '#475569', fontFamily: "'Courier New', monospace", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {url}
+                            </div>
+                            <button onClick={handleCopy} style={{ padding: '10px 14px', background: copied ? '#16a34a' : '#062b14', border: 'none', borderRadius: '8px', color: '#ffffff', fontSize: '12px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', transition: 'background 0.2s', display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                                {copied ? (
+                                    <>
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                        Copied!
+                                    </>
+                                ) : (
+                                    <>
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                        Copy
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+
+                    {isExpired && (
+                        <div style={{ width: '100%', padding: '12px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', fontSize: '12px', color: '#ef4444', textAlign: 'center', fontWeight: 600 }}>
+                            This link has expired. Close and reopen to generate a new one.
+                        </div>
+                    )}
+
+                    <button onClick={onClose} style={{ width: '100%', padding: '11px', background: '#f8fafb', border: '1px solid #e2e8f0', borderRadius: '10px', color: '#64748b', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', transition: 'background 0.15s' }}>
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function OperationalOverview() {
     const [enrichedResults, setEnrichedResults] = useState([]);
     const [loading, setLoading] = useState(true);
     const [viewMode, setViewMode] = useState('overall');
+    const [showQRModal, setShowQRModal] = useState(false);
 
     const adminRole = localStorage.getItem("admin_role");
     const isSuperAdmin = adminRole === 'superadmin';
@@ -65,6 +314,7 @@ function OperationalOverview() {
                         totalQuestions: r.totalQuestions,
                         subjectScores: r.subjectScores || [],
                         submittedAt: r.submittedAt || r.createdAt || null,
+                        firstCourse: user.firstCourse || '',
                     };
                 });
                 setEnrichedResults(merged);
@@ -199,16 +449,52 @@ function OperationalOverview() {
 
     return (
         <div style={{ padding: '4px 0' }}>
-
-            {/* Tab Toggle */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    {viewMode === 'today' && (
+                        <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 500 }}>
+                            {todayFiltered.length} result{todayFiltered.length !== 1 ? 's' : ''} today
+                        </span>
+                    )}
+                    {viewMode === 'today' && (
+                        <button
+                            onClick={() => setShowQRModal(true)}
+                            title="Generate QR for Daily Results"
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                padding: '5px 11px',
+                                background: '#f0fdf4',
+                                border: '1px solid #bbf7d0',
+                                borderRadius: '8px',
+                                color: '#16a34a',
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                fontFamily: 'inherit',
+                                transition: 'background 0.18s, box-shadow 0.18s',
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.background = '#dcfce7'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(22,163,74,0.15)'; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = '#f0fdf4'; e.currentTarget.style.boxShadow = 'none'; }}
+                        >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <rect x="3" y="3" width="7" height="7" rx="1"/>
+                                <rect x="14" y="3" width="7" height="7" rx="1"/>
+                                <rect x="3" y="14" width="7" height="7" rx="1"/>
+                                <rect x="14" y="14" width="3" height="3" rx="0.5"/>
+                                <rect x="18" y="14" width="3" height="3" rx="0.5"/>
+                                <rect x="14" y="18" width="3" height="3" rx="0.5"/>
+                                <rect x="18" y="18" width="3" height="3" rx="0.5"/>
+                            </svg>
+                            Share QR
+                        </button>
+                    )}
+                </div>
                 <TabToggle />
-                {viewMode === 'today' && (
-                    <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 500 }}>
-                        {todayFiltered.length} result{todayFiltered.length !== 1 ? 's' : ''} today
-                    </span>
-                )}
             </div>
+
+            {showQRModal && <QRLinkModal onClose={() => setShowQRModal(false)} />}
 
             {isSuperAdmin ? (
                 <>
@@ -376,6 +662,7 @@ const Icon = ({ name }) => {
         chevronRight: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>,
         shield: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>,
         user: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>,
+        zap: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg>,
     };
     return icons[name] || null;
 };
@@ -383,10 +670,10 @@ const Icon = ({ name }) => {
 const availableCourses = [
     "Bachelor of Science in Computer Science",
     "Bachelor of Science in Hospitality Management",
-    "Bachelor of Secondary Education major in Filipino (BSED – Filipino)",
-    "Bachelor of Secondary Education major in English (BSED – English)",
-    "Bachelor of Secondary Education major in Mathematics (BSED – Math)",
-    "Bachelor of Secondary Education major in Social Studies (BSED – Social Studies)",
+    "Bachelor of Secondary Education major in Filipino (BSED \u2013 Filipino)",
+    "Bachelor of Secondary Education major in English (BSED \u2013 English)",
+    "Bachelor of Secondary Education major in Mathematics (BSED \u2013 Math)",
+    "Bachelor of Secondary Education major in Social Studies (BSED \u2013 Social Studies)",
     "Bachelor of Elementary Education (BEEd)",
     "Bachelor of Science in Accountancy",
     "Bachelor of Science in Business Administration (Financial Management)",
@@ -583,199 +870,42 @@ const ProfileDropdown = ({ onClose, adminLabel, adminRole, isSuperAdmin, avatarL
     return (
         <>
             <style>{`
-                .no-animation { }
-                .pd-overlay {
-                    position: fixed;
-                    inset: 0;
-                    z-index: 1200;
-                    background: transparent;
-                }
-                .pd-card {
-                    position: fixed;
-                    top: 78px;
-                    right: 28px;
-                    width: 300px;
-                    background: #ffffff;
-                    border-radius: 16px;
-                    border: 1px solid #e8edf2;
-                    box-shadow: 0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06);
-                    overflow: hidden;
-                    z-index: 1201;
-                }
-                .pd-arrow {
-                    position: absolute;
-                    top: -7px;
-                    right: 36px;
-                    width: 14px;
-                    height: 14px;
-                    background: #ffffff;
-                    border-left: 1px solid #e8edf2;
-                    border-top: 1px solid #e8edf2;
-                    transform: rotate(45deg);
-                    border-radius: 2px 0 0 0;
-                }
-                .pd-header {
-                    padding: 18px 18px 16px;
-                    background: #f8fafb;
-                    border-bottom: 1px solid #edf2f7;
-                    display: flex;
-                    align-items: center;
-                    gap: 13px;
-                }
-                .pd-avatar {
-                    width: 46px;
-                    height: 46px;
-                    border-radius: 50%;
-                    overflow: hidden;
-                    border: 2px solid #e2e8f0;
-                    flex-shrink: 0;
-                }
-                .pd-avatar img {
-                    width: 100%;
-                    height: 100%;
-                    object-fit: cover;
-                    display: block;
-                }
-                .pd-name {
-                    margin: 0 0 4px;
-                    font-size: 14px;
-                    font-weight: 700;
-                    color: #0f172a;
-                    letter-spacing: -0.2px;
-                }
-                .pd-badge {
-                    display: inline-flex;
-                    align-items: center;
-                    gap: 4px;
-                    padding: 2px 8px;
-                    background: #f0fdf4;
-                    border: 1px solid #bbf7d0;
-                    border-radius: 99px;
-                    font-size: 10px;
-                    font-weight: 700;
-                    color: #16a34a;
-                    letter-spacing: 0.2px;
-                }
-                .pd-meta {
-                    padding: 4px 0;
-                    border-bottom: 1px solid #edf2f7;
-                }
-                .pd-meta-row {
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                    padding: 8px 18px;
-                    gap: 12px;
-                }
-                .pd-meta-row + .pd-meta-row {
-                    border-top: 1px solid #f1f5f9;
-                }
-                .pd-meta-label {
-                    font-size: 10px;
-                    font-weight: 600;
-                    color: #94a3b8;
-                    text-transform: uppercase;
-                    letter-spacing: 0.5px;
-                    flex-shrink: 0;
-                }
-                .pd-meta-value {
-                    font-size: 11.5px;
-                    font-weight: 600;
-                    color: #334155;
-                    text-align: right;
-                }
-                .pd-actions {
-                    padding: 6px 8px;
-                    border-bottom: 1px solid #edf2f7;
-                }
-                .pd-action-btn {
-                    width: 100%;
-                    display: flex;
-                    align-items: center;
-                    gap: 10px;
-                    padding: 10px 12px;
-                    background: transparent;
-                    border: none;
-                    border-radius: 10px;
-                    cursor: pointer;
-                    font-family: inherit;
-                    transition: background 0.15s;
-                    text-align: left;
-                }
-                .pd-action-btn:hover {
-                    background: #f8fafb;
-                }
-                .pd-action-btn.danger:hover {
-                    background: #fef2f2;
-                }
-                .pd-action-icon {
-                    width: 30px;
-                    height: 30px;
-                    border-radius: 8px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    flex-shrink: 0;
-                }
-                .pd-action-icon.info-icon {
-                    background: #f0fdf4;
-                    color: #16a34a;
-                }
-                .pd-action-icon.danger-icon {
-                    background: #fef2f2;
-                    color: #ef4444;
-                }
-                .pd-action-text {
-                    flex: 1;
-                    font-size: 13px;
-                    font-weight: 600;
-                    color: #334155;
-                }
-                .pd-action-btn.danger .pd-action-text {
-                    color: #ef4444;
-                }
-                .pd-action-chevron {
-                    color: #cbd5e1;
-                    display: flex;
-                    align-items: center;
-                }
-                .pd-action-btn.danger .pd-action-chevron {
-                    color: #fca5a5;
-                }
-                .pd-footer {
-                    padding: 10px 8px 10px;
-                }
-                .pd-close-btn {
-                    width: 100%;
-                    padding: 9px;
-                    background: #f8fafb;
-                    border: 1px solid #e2e8f0;
-                    border-radius: 10px;
-                    color: #64748b;
-                    font-size: 12px;
-                    font-weight: 600;
-                    cursor: pointer;
-                    font-family: inherit;
-                    transition: all 0.15s;
-                }
-                .pd-close-btn:hover {
-                    background: #f1f5f9;
-                    color: #334155;
-                }
+                .pd-overlay { position: fixed; inset: 0; z-index: 1200; background: transparent; }
+                .pd-card { position: fixed; top: 78px; right: 28px; width: 300px; background: #ffffff; border-radius: 16px; border: 1px solid #e8edf2; box-shadow: 0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06); overflow: hidden; z-index: 1201; }
+                .pd-arrow { position: absolute; top: -7px; right: 36px; width: 14px; height: 14px; background: #ffffff; border-left: 1px solid #e8edf2; border-top: 1px solid #e8edf2; transform: rotate(45deg); border-radius: 2px 0 0 0; }
+                .pd-header { padding: 18px 18px 16px; background: #f8fafb; border-bottom: 1px solid #edf2f7; display: flex; align-items: center; gap: 13px; }
+                .pd-avatar { width: 46px; height: 46px; border-radius: 50%; overflow: hidden; border: 2px solid #e2e8f0; flex-shrink: 0; }
+                .pd-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+                .pd-name { margin: 0 0 4px; font-size: 14px; font-weight: 700; color: #0f172a; letter-spacing: -0.2px; }
+                .pd-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 99px; font-size: 10px; font-weight: 700; color: #16a34a; letter-spacing: 0.2px; }
+                .pd-meta { padding: 4px 0; border-bottom: 1px solid #edf2f7; }
+                .pd-meta-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 18px; gap: 12px; }
+                .pd-meta-row + .pd-meta-row { border-top: 1px solid #f1f5f9; }
+                .pd-meta-label { font-size: 10px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; flex-shrink: 0; }
+                .pd-meta-value { font-size: 11.5px; font-weight: 600; color: #334155; text-align: right; }
+                .pd-actions { padding: 6px 8px; border-bottom: 1px solid #edf2f7; }
+                .pd-action-btn { width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: transparent; border: none; border-radius: 10px; cursor: pointer; font-family: inherit; transition: background 0.15s; text-align: left; }
+                .pd-action-btn:hover { background: #f8fafb; }
+                .pd-action-btn.danger:hover { background: #fef2f2; }
+                .pd-action-icon { width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+                .pd-action-icon.info-icon { background: #f0fdf4; color: #16a34a; }
+                .pd-action-icon.danger-icon { background: #fef2f2; color: #ef4444; }
+                .pd-action-text { flex: 1; font-size: 13px; font-weight: 600; color: #334155; }
+                .pd-action-btn.danger .pd-action-text { color: #ef4444; }
+                .pd-action-chevron { color: #cbd5e1; display: flex; align-items: center; }
+                .pd-action-btn.danger .pd-action-chevron { color: #fca5a5; }
+                .pd-footer { padding: 10px 8px 10px; }
+                .pd-close-btn { width: 100%; padding: 9px; background: #f8fafb; border: 1px solid #e2e8f0; border-radius: 10px; color: #64748b; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; transition: all 0.15s; }
+                .pd-close-btn:hover { background: #f1f5f9; color: #334155; }
             `}</style>
             <div className="pd-overlay" onClick={onClose} />
             <div className="pd-card">
                 <div className="pd-arrow" />
                 <div className="pd-header">
-                    <div className="pd-avatar">
-                        <img src={avatarLogo} alt="Admin" />
-                    </div>
+                    <div className="pd-avatar"><img src={avatarLogo} alt="Admin" /></div>
                     <div>
                         <p className="pd-name">{adminLabel}</p>
-                        <span className="pd-badge">
-                            <Icon name="shield" />
-                            {roleDisplay}
-                        </span>
+                        <span className="pd-badge"><Icon name="shield" />{roleDisplay}</span>
                     </div>
                 </div>
                 <div className="pd-meta">
@@ -817,104 +947,20 @@ const AboutModal = ({ onClose }) => {
     return (
         <>
             <style>{`
-                .about-side-card {
-                    position: fixed;
-                    top: 78px;
-                    right: 340px;
-                    width: 320px;
-                    background: #ffffff;
-                    border-radius: 16px;
-                    border: 1px solid #e8edf2;
-                    box-shadow: 0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06);
-                    overflow: hidden;
-                    z-index: 1202;
-                }
-                .about-card-header {
-                    padding: 22px 20px 18px;
-                    background: #f8fafb;
-                    border-bottom: 1px solid #edf2f7;
-                    display: flex;
-                    flex-direction: column;
-                    align-items: center;
-                    text-align: center;
-                }
-                .about-icon-wrap {
-                    width: 50px;
-                    height: 50px;
-                    border-radius: 14px;
-                    background: #f0fdf4;
-                    border: 1.5px solid #bbf7d0;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    margin-bottom: 12px;
-                }
-                .about-title {
-                    margin: 0 0 3px;
-                    font-size: 15px;
-                    font-weight: 800;
-                    color: #0f172a;
-                    letter-spacing: -0.2px;
-                }
-                .about-subtitle {
-                    margin: 0;
-                    font-size: 11px;
-                    color: #94a3b8;
-                    font-weight: 500;
-                }
-                .about-meta {
-                    padding: 4px 0;
-                    border-bottom: 1px solid #edf2f7;
-                }
-                .about-meta-row {
-                    display: flex;
-                    align-items: flex-start;
-                    justify-content: space-between;
-                    padding: 10px 20px;
-                    gap: 14px;
-                }
-                .about-meta-row + .about-meta-row {
-                    border-top: 1px solid #f1f5f9;
-                }
-                .about-meta-label {
-                    font-size: 10px;
-                    font-weight: 600;
-                    color: #94a3b8;
-                    text-transform: uppercase;
-                    letter-spacing: 0.5px;
-                    flex-shrink: 0;
-                    padding-top: 1px;
-                }
-                .about-meta-value {
-                    font-size: 12px;
-                    font-weight: 600;
-                    color: #334155;
-                    text-align: right;
-                }
-                .about-meta-value.accent {
-                    color: #16a34a;
-                    font-weight: 700;
-                }
-                .about-footer {
-                    padding: 12px 14px;
-                }
-                .about-close-btn {
-                    width: 100%;
-                    padding: 10px;
-                    background: #062b14;
-                    border: none;
-                    border-radius: 10px;
-                    color: #ffffff;
-                    font-size: 13px;
-                    font-weight: 700;
-                    cursor: pointer;
-                    font-family: inherit;
-                    letter-spacing: 0.3px;
-                    transition: background 0.15s;
-                }
-                .about-close-btn:hover {
-                    background: #0c4222;
-                }
+                .about-side-card { position: fixed; top: 78px; right: 340px; width: 320px; background: #ffffff; border-radius: 16px; border: 1px solid #e8edf2; box-shadow: 0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06); overflow: hidden; z-index: 1202; }
+                .about-card-header { padding: 22px 20px 18px; background: #f8fafb; border-bottom: 1px solid #edf2f7; display: flex; flex-direction: column; align-items: center; text-align: center; }
+                .about-icon-wrap { width: 50px; height: 50px; border-radius: 14px; background: #f0fdf4; border: 1.5px solid #bbf7d0; display: flex; align-items: center; justify-content: center; margin-bottom: 12px; }
+                .about-title { margin: 0 0 3px; font-size: 15px; font-weight: 800; color: #0f172a; letter-spacing: -0.2px; }
+                .about-subtitle { margin: 0; font-size: 11px; color: #94a3b8; font-weight: 500; }
+                .about-meta { padding: 4px 0; border-bottom: 1px solid #edf2f7; }
+                .about-meta-row { display: flex; align-items: flex-start; justify-content: space-between; padding: 10px 20px; gap: 14px; }
+                .about-meta-row + .about-meta-row { border-top: 1px solid #f1f5f9; }
+                .about-meta-label { font-size: 10px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; flex-shrink: 0; padding-top: 1px; }
+                .about-meta-value { font-size: 12px; font-weight: 600; color: #334155; text-align: right; }
+                .about-meta-value.accent { color: #16a34a; font-weight: 700; }
+                .about-footer { padding: 12px 14px; }
+                .about-close-btn { width: 100%; padding: 10px; background: #062b14; border: none; border-radius: 10px; color: #ffffff; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; letter-spacing: 0.3px; transition: background 0.15s; }
+                .about-close-btn:hover { background: #0c4222; }
             `}</style>
             <div className="about-side-card">
                 <div className="about-card-header">
@@ -937,6 +983,78 @@ const AboutModal = ({ onClose }) => {
                 </div>
                 <div className="about-footer">
                     <button className="about-close-btn" onClick={onClose}>Close</button>
+                </div>
+            </div>
+        </>
+    );
+};
+
+const QuickActionsDropdown = ({ onClose, onStudentCode, onNavigate }) => {
+    const actions = [
+        { label: 'Student Code', desc: 'Register & enter exam scores', icon: 'registerStudent', action: onStudentCode },
+        { label: 'View Student List', desc: 'Browse all registered students', icon: 'students', action: () => onNavigate('STUDENT LIST') },
+        { label: 'View Question Bank', desc: 'Manage exam questions', icon: 'questions', action: () => onNavigate('QUESTION BANK') },
+        { label: 'View All Results', desc: 'See exam results & scores', icon: 'results', action: () => onNavigate('RESULTS') },
+    ];
+
+    return (
+        <>
+            <style>{`
+                .qa-overlay { position: fixed; inset: 0; z-index: 900; background: transparent; }
+                @keyframes qaDropIn { from{opacity:0;transform:translateY(-8px) scale(0.97)}to{opacity:1;transform:translateY(0) scale(1)} }
+                .qa-card {
+                    position: absolute;
+                    top: calc(100% + 10px);
+                    right: 0;
+                    width: 280px;
+                    background: #ffffff;
+                    border-radius: 14px;
+                    border: 1px solid #e8edf2;
+                    box-shadow: 0 12px 40px rgba(0,0,0,0.14), 0 2px 8px rgba(0,0,0,0.06);
+                    overflow: hidden;
+                    z-index: 901;
+                    animation: qaDropIn 0.2s cubic-bezier(0.34,1.56,0.64,1) both;
+                }
+                .qa-arrow {
+                    position: absolute;
+                    top: -7px;
+                    right: 24px;
+                    width: 14px;
+                    height: 14px;
+                    background: #ffffff;
+                    border-left: 1px solid #e8edf2;
+                    border-top: 1px solid #e8edf2;
+                    transform: rotate(45deg);
+                    border-radius: 2px 0 0 0;
+                }
+                .qa-header { padding: 12px 16px 10px; background: #f8fafb; border-bottom: 1px solid #edf2f7; }
+                .qa-header-label { font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.8px; margin: 0; }
+                .qa-list { padding: 6px 8px 8px; display: flex; flex-direction: column; gap: 2px; }
+                .qa-item { display: flex; align-items: center; gap: 10px; padding: 10px 10px; background: transparent; border: none; border-radius: 10px; cursor: pointer; font-family: inherit; transition: background 0.15s; text-align: left; width: 100%; }
+                .qa-item:hover { background: #f0fdf4; }
+                .qa-item-icon { width: 32px; height: 32px; border-radius: 8px; background: #f0fdf4; border: 1px solid #bbf7d0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #16a34a; }
+                .qa-item-text { flex: 1; }
+                .qa-item-label { font-size: 13px; font-weight: 600; color: #0f172a; display: block; line-height: 1.2; }
+                .qa-item-desc { font-size: 11px; color: #94a3b8; display: block; margin-top: 1px; }
+                .qa-item-chevron { color: #cbd5e1; display: flex; align-items: center; }
+            `}</style>
+            <div className="qa-overlay" onClick={onClose} />
+            <div className="qa-card">
+                <div className="qa-arrow" />
+                <div className="qa-header">
+                    <p className="qa-header-label">Quick Actions</p>
+                </div>
+                <div className="qa-list">
+                    {actions.map(item => (
+                        <button key={item.label} className="qa-item" onClick={() => { onClose(); item.action(); }}>
+                            <span className="qa-item-icon"><Icon name={item.icon} /></span>
+                            <span className="qa-item-text">
+                                <span className="qa-item-label">{item.label}</span>
+                                <span className="qa-item-desc">{item.desc}</span>
+                            </span>
+                            <span className="qa-item-chevron"><Icon name="chevronRight" /></span>
+                        </button>
+                    ))}
                 </div>
             </div>
         </>
@@ -1143,6 +1261,7 @@ const StudentCodeModal = ({ onClose }) => {
 export default function AdminDashboardPage() {
     const [activeTab, setActiveTab] = useState('DASHBOARD');
     const [modalState, setModalState] = useState(null);
+    const [quickActionsOpen, setQuickActionsOpen] = useState(false);
 
     useEffect(() => { document.title = "Admin Dashboard"; }, []);
 
@@ -1210,23 +1329,44 @@ export default function AdminDashboardPage() {
                             <div className="kns-banner-left">
                                 <h1>Entrance Exam Management</h1>
                                 <p>
-                                    {adminRole === 'avr' ? 'Welcome, AVR Admin!' : adminRole === 'comlab-2' ? 'Welcome, Comlab Admin!' : 'Welcome, JPCS Admin!'}
+                                    {adminRole === 'avr' ? 'Welcome, AVR Admin!' : adminRole === 'comlab-2' ? 'Welcome, Comlab Admin!' : 'Welcome, Jayvee Madriaga Nacino | JPCS Admin!'}
                                 </p>
                             </div>
+                            <div style={{ position: 'relative' }}>
+                                <button
+                                    className="kns-quick-actions-btn"
+                                    onClick={() => setQuickActionsOpen(o => !o)}
+                                >
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <Icon name="zap" />
+                                        Quick Actions
+                                    </span>
+                                    <svg
+                                        width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                        stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                                        style={{ transform: quickActionsOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }}
+                                    >
+                                        <polyline points="6 9 12 15 18 9" />
+                                    </svg>
+                                </button>
+                                {quickActionsOpen && (
+                                    <QuickActionsDropdown
+                                        onClose={() => setQuickActionsOpen(false)}
+                                        onStudentCode={handleStudentCodeClick}
+                                        onNavigate={(tab) => { setActiveTab(tab); setQuickActionsOpen(false); }}
+                                    />
+                                )}
+                            </div>
                         </div>
+
                         <div className="kns-dashboard-grid">
                             <div className="kns-activity-panel">
                                 <div className="kns-panel-header"><h3>Operational Overview</h3></div>
                                 <OperationalOverview />
                             </div>
-                            <div className="kns-actions-panel">
-                                <div className="kns-panel-header"><h3>Quick Actions</h3></div>
-                                <div className="kns-actions-grid">
-                                    <button className="kns-action-btn" onClick={handleStudentCodeClick}>Student Code</button>
-                                    <button className="kns-action-btn" onClick={() => setActiveTab('STUDENT LIST')}>View Student List</button>
-                                    <button className="kns-action-btn" onClick={() => setActiveTab('QUESTION BANK')}>View Question Bank</button>
-                                    <button className="kns-action-btn" onClick={() => setActiveTab('RESULTS')}>View All Results</button>
-                                </div>
+                            <div className="kns-dept-panel">
+                                <div className="kns-panel-header"><h3>Department Breakdown</h3></div>
+                                <DeptBarGraphPanel />
                             </div>
                         </div>
                     </div>
@@ -1322,4 +1462,52 @@ export default function AdminDashboardPage() {
             )}
         </div>
     );
+}
+
+function DeptBarGraphPanel() {
+    const [enrichedResults, setEnrichedResults] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const adminRole = localStorage.getItem("admin_role");
+    const isSuperAdmin = adminRole === 'superadmin';
+
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                const [resultsRes, usersRes] = await Promise.all([
+                    fetch(`${import.meta.env.VITE_API_URL}/api/all-results`),
+                    fetch(`${import.meta.env.VITE_API_URL}/api/users`)
+                ]);
+                if (!resultsRes.ok || !usersRes.ok) throw new Error();
+                const resultsData = await resultsRes.json();
+                const usersData = await usersRes.json();
+                const userMap = {};
+                usersData.forEach(u => { userMap[u._id] = u; });
+                const merged = resultsData.map(r => {
+                    const user = userMap[r.userId?._id || r.userId] || {};
+                    return { room: user.room || '—', firstCourse: user.firstCourse || '' };
+                });
+                setEnrichedResults(merged);
+            } catch {
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+    }, []);
+
+    if (loading) {
+        return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', padding: '4px 0' }}>
+                {[0, 1, 2, 3].map(i => (
+                    <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <SkeletonBlock width="60%" height="12px" />
+                        <SkeletonBlock width="100%" height="10px" radius="99px" />
+                    </div>
+                ))}
+            </div>
+        );
+    }
+
+    const activeResults = isSuperAdmin ? enrichedResults : enrichedResults.filter(r => r.room === adminRole);
+    return <DeptBarGraph results={activeResults} />;
 }

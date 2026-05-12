@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import axios from "axios";
 import Swal from "sweetalert2";
-import { Pencil, Trash2, ArrowUpDown, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { Pencil, Trash2, ArrowUpDown, ChevronLeft, ChevronRight, Search, Eye, X, CheckCircle2, XCircle } from "lucide-react";
 import StudentPrint from "./PrintPage";
 import "./admincss/resultPage.css";
 
@@ -18,6 +18,11 @@ export default function ResultsPage() {
     const [sortConfig, setSortConfig] = useState({ key: 'submittedAt', direction: 'desc' });
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
+
+    const [viewModalOpen, setViewModalOpen] = useState(false);
+    const [viewingResult, setViewingResult] = useState(null);
+    const [viewQuestions, setViewQuestions] = useState([]);
+    const [viewLoading, setViewLoading] = useState(false);
 
     const API_URL = `${import.meta.env.VITE_API_URL}/api`;
     const adminRole = localStorage.getItem("admin_role");
@@ -146,6 +151,19 @@ export default function ResultsPage() {
         }
     };
 
+    const handleViewOpen = async (result) => {
+        setViewLoading(true);
+        setViewingResult(result);
+        setViewModalOpen(true);
+        try {
+            const questionsRes = await axios.get(`${API_URL}/all-questions`);
+            setViewQuestions(questionsRes.data);
+        } catch (err) {
+            Swal.fire("Error", "Failed to load questions.", "error");
+        }
+        setViewLoading(false);
+    };
+
     const handleScoreChange = (index, value) => {
         const updated = [...subjectScores];
         const parsed = parseInt(value);
@@ -175,8 +193,6 @@ export default function ResultsPage() {
 
     const getPageNumbers = () => {
         const pages = [];
-        const maxVisible = 3;
-        
         if (totalPages <= 5) {
             for (let i = 1; i <= totalPages; i++) pages.push(i);
         } else {
@@ -192,6 +208,29 @@ export default function ResultsPage() {
     };
 
     const roomLabel = adminRole === 'avr' ? 'AVR' : adminRole === 'comlab-2' ? 'Computer Laboratory 2' : null;
+
+    const buildViewData = () => {
+        if (!viewingResult || !viewQuestions.length) return [];
+
+        const answerMap = {};
+        viewingResult.answers.forEach(a => {
+            answerMap[a.questionId?.toString()] = {
+                selected: a.selectedOption,
+                isCorrect: a.isCorrect
+            };
+        });
+
+        const subjectMap = {};
+        viewQuestions.forEach(q => {
+            const subject = q.subjectId?.name || "General";
+            if (!subjectMap[subject]) subjectMap[subject] = [];
+            subjectMap[subject].push({ ...q, answerData: answerMap[q._id?.toString()] });
+        });
+
+        return Object.entries(subjectMap).map(([subject, questions]) => ({ subject, questions }));
+    };
+
+    const viewData = buildViewData();
 
     return (
         <div className="kns-res-page">
@@ -300,10 +339,13 @@ export default function ResultsPage() {
                                             </button>
                                         </td>
                                         <td className="res-td-actions">
-                                            <button className="res-btn-edit" onClick={() => handleEditOpen(res)}>
+                                            <button className="res-btn-view" title="View Answers" onClick={() => handleViewOpen(res)}>
+                                                <Eye size={18} />
+                                            </button>
+                                            <button className="res-btn-edit" title="Edit Score" onClick={() => handleEditOpen(res)}>
                                                 <Pencil size={18} />
                                             </button>
-                                            <button className="res-btn-delete" onClick={() => handleDelete(res._id, res.userId?.name)}>
+                                            <button className="res-btn-delete" title="Delete" onClick={() => handleDelete(res._id, res.userId?.name)}>
                                                 <Trash2 size={18} />
                                             </button>
                                         </td>
@@ -386,6 +428,150 @@ export default function ResultsPage() {
                             <button className="btn-text" onClick={() => { setEditModalOpen(false); setEditingResult(null); }}>Cancel</button>
                             <button className="btn-primary" onClick={handleSaveEdit}>Save Changes</button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {viewModalOpen && viewingResult && (
+                <div className="kns-view-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) { setViewModalOpen(false); setViewingResult(null); setViewQuestions([]); } }}>
+                    <div className="kns-view-modal">
+                        <div className="kns-view-modal-header">
+                            <div className="kns-view-modal-student">
+                                <h2>{viewingResult.userId?.name || "Unknown Student"}</h2>
+                                <div className="kns-view-modal-meta">
+                                    <span className="kns-view-score-badge">
+                                        Final Score: <strong>{viewingResult.score} / {viewingResult.totalQuestions}</strong>
+                                    </span>
+                                    <span className="kns-view-date-badge">
+                                        {new Date(viewingResult.submittedAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
+                                    </span>
+                                </div>
+                            </div>
+                            <button className="kns-view-close-btn" onClick={() => { setViewModalOpen(false); setViewingResult(null); setViewQuestions([]); }}>
+                                <X size={22} />
+                            </button>
+                        </div>
+
+                        <div className="kns-view-legend">
+                            <span className="legend-item legend-correct"><CheckCircle2 size={14} /> Correct Answer</span>
+                            <span className="legend-item legend-wrong"><XCircle size={14} /> Wrong Answer</span>
+                            <span className="legend-item legend-key"><span className="legend-key-dot" />Correct Key (Right Panel)</span>
+                        </div>
+
+                        {viewLoading ? (
+                            <div className="kns-view-loading">Loading questions...</div>
+                        ) : (
+                            <div className="kns-view-body">
+                                <div className="kns-view-col kns-view-left">
+                                    <div className="kns-view-col-header">
+                                        <span>STUDENT ANSWERS</span>
+                                    </div>
+                                    <div className="kns-view-col-content">
+                                        {viewData.map(({ subject, questions }) => (
+                                            <div key={subject} className="kns-view-subject-block">
+                                                <h3 className="kns-view-subject-title">{subject.toUpperCase()}</h3>
+                                                {questions.map((q, idx) => {
+                                                    const answered = q.answerData?.selected && q.answerData.selected !== "N/A";
+                                                    const isCorrect = q.answerData?.isCorrect;
+                                                    const selectedOption = q.answerData?.selected;
+
+                                                    return (
+                                                        <div
+                                                            key={q._id}
+                                                            className={`kns-view-question-card ${!answered ? 'kns-view-unanswered' : isCorrect ? 'kns-view-card-correct' : 'kns-view-card-wrong'}`}
+                                                        >
+                                                            <div className="kns-view-question-top">
+                                                                <span className="kns-view-q-num">Q{idx + 1}</span>
+                                                                <p className="kns-view-q-text">{q.text}</p>
+                                                                {answered ? (
+                                                                    isCorrect
+                                                                        ? <CheckCircle2 size={18} className="kns-view-status-icon correct" />
+                                                                        : <XCircle size={18} className="kns-view-status-icon wrong" />
+                                                                ) : (
+                                                                    <span className="kns-view-no-answer-tag">No Answer</span>
+                                                                )}
+                                                            </div>
+                                                            <div className="kns-view-options-grid">
+                                                                {["A", "B", "C", "D"].map(letter => {
+                                                                    const optText = q.options?.[letter];
+                                                                    if (!optText) return null;
+                                                                    const isSelected = selectedOption === letter;
+                                                                    const isThisCorrect = q.correct === letter;
+                                                                    let optClass = "kns-view-option";
+                                                                    if (isSelected && isCorrect) optClass += " kns-opt-selected-correct";
+                                                                    else if (isSelected && !isCorrect) optClass += " kns-opt-selected-wrong";
+                                                                    else if (!isSelected && isThisCorrect && answered && !isCorrect) optClass += " kns-opt-missed";
+                                                                    return (
+                                                                        <div key={letter} className={optClass}>
+                                                                            <span className="kns-view-opt-letter">{letter}.</span>
+                                                                            <span>{optText}</span>
+                                                                            {isSelected && <span className="kns-opt-tag">{isCorrect ? "✓ Your Answer" : "✗ Your Answer"}</span>}
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="kns-view-col kns-view-right">
+                                    <div className="kns-view-col-header kns-view-col-header-right">
+                                        <span>ANSWER KEY</span>
+                                    </div>
+                                    <div className="kns-view-col-content">
+                                        {viewData.map(({ subject, questions }) => {
+                                            const subjectResult = viewingResult.subjectScores?.find(
+                                                s => s.subject.toLowerCase() === subject.toLowerCase()
+                                            );
+                                            return (
+                                                <div key={subject} className="kns-view-subject-block">
+                                                    <div className="kns-view-subject-title-row">
+                                                        <h3 className="kns-view-subject-title">{subject.toUpperCase()}</h3>
+                                                        {subjectResult && (
+                                                            <span className="kns-view-subject-score">
+                                                                {subjectResult.score}/{subjectResult.total}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    {questions.map((q, idx) => {
+                                                        const isCorrect = q.answerData?.isCorrect;
+                                                        const answered = q.answerData?.selected && q.answerData.selected !== "N/A";
+                                                        return (
+                                                            <div key={q._id} className="kns-view-answer-key-row">
+                                                                <span className="kns-view-ak-num">Q{idx + 1}</span>
+                                                                <div className="kns-view-ak-content">
+                                                                    <p className="kns-view-ak-qtext">{q.text}</p>
+                                                                    <div className="kns-view-ak-answer">
+                                                                        <span className="kns-view-ak-label">Correct:</span>
+                                                                        <span className="kns-view-ak-letter">{q.correct}</span>
+                                                                        <span className="kns-view-ak-opttext">{q.options?.[q.correct]}</span>
+                                                                    </div>
+                                                                    <div className="kns-view-ak-student-ans">
+                                                                        <span className="kns-view-ak-label">Student:</span>
+                                                                        {!answered ? (
+                                                                            <span className="kns-ak-no-ans">No Answer</span>
+                                                                        ) : (
+                                                                            <span className={`kns-view-ak-student-letter ${isCorrect ? 'ak-correct' : 'ak-wrong'}`}>
+                                                                                {q.answerData?.selected} — {q.options?.[q.answerData?.selected]}
+                                                                                {isCorrect ? <CheckCircle2 size={13} style={{ marginLeft: 4 }} /> : <XCircle size={13} style={{ marginLeft: 4 }} />}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
