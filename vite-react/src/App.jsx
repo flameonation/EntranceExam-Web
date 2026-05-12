@@ -1,21 +1,12 @@
 import React from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import StudentRegisterPage from './components/StudentRegisterPage'
 import ExaminationPage from './components/ExaminationPage'
 import AdminLoginPage from './admin/AdminLoginPage'
-import AdminDashboardPage from './admin/AdminDashboardPage';
-import DailyResultsPage from './admin/DailyResultsPage'
+import AdminDashboardPage from './admin/AdminDashboardPage'
 import Snap from './components/Snap'
+import DailyResultsPage from './admin/DailyResultsPage'
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1000 * 60 * 5,
-      retry: 1,
-    },
-  },
-})
 
 function ProtectedAdminRoute({ children }) {
   const token = localStorage.getItem("admin_token");
@@ -25,27 +16,20 @@ function ProtectedAdminRoute({ children }) {
 
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <Routes>
-          <Route path='/' element={<Snap/>} />
-          <Route path="/register-avr" element={<StudentRegisterPage room="avr" />} />
-          <Route path="/register-comlab" element={<StudentRegisterPage room="comlab-2" />} />
-          <Route path="/examination" element={<ExaminationPage />} />
-          <Route path="/admin/login" element={<AdminLoginPage />} />
-          <Route path="/daily-results" element={<DailyResultsPage />} />
-          <Route path="/admin/dashboard" element={
-            <ProtectedAdminRoute>
-              <AdminDashboardPage />
-            </ProtectedAdminRoute>
-          } />
-          <Route path="/admin/daily-results" element={
-            <ProtectedAdminRoute>
-              <DailyResultsPage />
-            </ProtectedAdminRoute>
-          } />
-        </Routes>
-      </BrowserRouter>
-    </QueryClientProvider>
+    <BrowserRouter>
+      <Routes>
+        <Route path='/' element={<Snap />} />
+        <Route path="/register-avr" element={<StudentRegisterPage room="avr" />} />
+        <Route path="/register-comlab" element={<StudentRegisterPage room="comlab-2" />} />
+        <Route path="/examination" element={<ExaminationPage />} />
+        <Route path="/admin/login" element={<AdminLoginPage />} />
+        <Route path="/daily-results" element={<DailyResultsPage />} />
+        <Route path="/admin/dashboard" element={
+          <ProtectedAdminRoute>
+            <AdminDashboardPage />
+          </ProtectedAdminRoute>
+        } />
+      </Routes>
+    </BrowserRouter>
   )
 }
